@@ -10,7 +10,7 @@ import pickle
 from pathlib import Path
 import tracemalloc
 
-from src.tokenizer_worker import pre_tokenize_chunk
+from src.tokenizer_worker import compile_re, pre_tokenize_chunk
 
 
 def combine_counts(partial_counts):
@@ -70,8 +70,11 @@ def find_chunk_boundaries(
 
 
 def count_adjacent_pairs(
-    indices: dict[tuple[int], int],
-) -> tuple[dict[tuple[int, int], int], dict[tuple[int, int], set[tuple[int, ...]]]]:
+    indices: dict[bytes | tuple[int, ...], int],
+) -> tuple[
+    dict[tuple[int, int], int],
+    dict[tuple[int, int], set[bytes | tuple[int, ...]]],
+]:
     """
     Returns:
       - pair_counts: global count of each adjacent pair
@@ -92,7 +95,7 @@ def count_adjacent_pairs(
     return pair_counts, pair_locations
 
 
-def merge_sequence(seq: tuple[int], pair: tuple[int, int], new_index: int) -> tuple[int]:
+def merge_sequence(seq: bytes | tuple[int, ...], pair: tuple[int, int], new_index: int) -> tuple[int, ...]:
     """Merge one sequence only"""
     merged = []
     i = 0
@@ -110,9 +113,9 @@ def merge_sequence(seq: tuple[int], pair: tuple[int, int], new_index: int) -> tu
 
 
 def merge(
-    indices: dict[tuple[int], int],
+    indices: dict[bytes | tuple[int, ...], int],
     pair_counts: dict[tuple[int, int], int],
-    pair_locations: dict[tuple[int, int], set[tuple[int, ...]]],
+    pair_locations: dict[tuple[int, int], set[bytes | tuple[int, ...]]],
     pair: tuple[int, int],
     new_index: int,
 ) -> None:
@@ -153,16 +156,20 @@ def merge(
 def pre_tokenize(input_path, num_processes, special_tokens):
     with open(input_path, "rb") as f:
         boundaries = find_chunk_boundaries(f, num_processes, b"<|endoftext|>")
-    jobs = [(input_path, start, end, special_tokens) for start, end in zip(boundaries[:-1], boundaries[1:])]
+    jobs = [(input_path, start, end) for start, end in zip(boundaries[:-1], boundaries[1:])]
 
-    with Pool(processes=num_processes) as pool:
+    with Pool(
+        processes=num_processes,
+        initializer=compile_re,
+        initargs=(tuple(special_tokens),),
+    ) as pool:
         partial_counts = pool.map(pre_tokenize_chunk, jobs)
 
     return combine_counts(partial_counts)
 
 
 def train_bpe(input_path: str, vocab_size: int, special_tokens: list[str]):
-    indices = pre_tokenize(input_path, 6, special_tokens)
+    indices = pre_tokenize(input_path, 5, special_tokens)
     merges = []
     # Initial vocab is 256 bytes + special tokens
     vocab = {x: bytes([x]) for x in range(256)}
@@ -219,13 +226,13 @@ def main():
     tracemalloc.start(25)
 
     start = time.perf_counter()
-    vocab, merges = train_bpe("data/raw_data/owt_train.txt", 10000, special_tokens)
+    vocab, merges = train_bpe("data/raw_data/TinyStoriesV2-GPT4-train.txt", 10000, special_tokens)
     end = time.perf_counter()
     current_bytes, peak_bytes = tracemalloc.get_traced_memory()
     snapshot = tracemalloc.take_snapshot()
     tracemalloc.stop()
 
-    save_artifacts(vocab, merges, "output_owt")
+    save_artifacts(vocab, merges, "output_tiny_bpe")
     token_id, token_bytes = longest_token(vocab)
     print(f"Elapsed: {end - start}")
     print(f"Longest token: {token_id}, {token_bytes}")
