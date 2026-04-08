@@ -27,15 +27,9 @@ def pre_tokenize_chunk(args) -> dict[bytes, int]:
         # Run pre-tokenization on your chunk and store the counts for each pre-token
 
         # Remove special tokens before pre-tokenization
-        cleaned_chunks = [chunk]
-        if SPLIT_RE:
-            cleaned_chunks = SPLIT_RE.split(chunk)
-
-        # Use regex-based GPT-2 pre-tokenizer
-        for cleaned_chunk in cleaned_chunks:
+        # Use regex-based GPT-2 pre-tokenizer to count adjacent pairs
+        for cleaned_chunk in (SPLIT_RE.split(chunk) if SPLIT_RE else [chunk]):
             for match in PAT_RE.finditer(cleaned_chunk):
-                indices = match.group().encode("utf-8")
-                # count adjacent pairs
-                counts[indices] += 1
+                counts[match.group().encode("utf-8")] += 1
 
     return dict(counts)
