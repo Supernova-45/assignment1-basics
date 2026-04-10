@@ -44,3 +44,30 @@ class Embedding(torch.nn.Module):
 
     def forward(self, token_ids: torch.Tensor) -> torch.Tensor:
         return self.W[token_ids]
+
+
+class RMSNorm(torch.nn.Module):
+    """Implements RMSNorm."""
+    def __init__(
+        self, d_model: int, eps: float = 1e-5, device: torch.device | None = None, dtype: torch.dtype | None = None
+    ):
+        super().__init__()
+        self.d_model = d_model
+        self.eps = eps
+        self.device = device
+        self.dtype = dtype
+        self.gain = torch.nn.Parameter(torch.ones(d_model))
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        in_dtype = x.dtype
+        x = x.to(torch.float32)
+
+        rms = torch.sqrt(1 / self.d_model * torch.sum(x**2, dim=-1, keepdim=True) + self.eps)
+        result = x / rms * self.gain
+
+        return result.to(in_dtype)
+
+
+class SwiGLU():
+    """"""
+    def __init__()
