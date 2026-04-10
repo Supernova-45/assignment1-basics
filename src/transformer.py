@@ -1,6 +1,6 @@
 import math
-
 import torch
+from einops import rearrange
 
 
 class Linear(torch.nn.Module):
@@ -84,3 +84,28 @@ class SwiGLU(torch.nn.Module):
         y = x @ self.W1.T
         silu = y * torch.sigmoid(y)
         return (silu * (x @ self.W3.T)) @ self.W2.T
+
+
+class RotaryPositionalEmbedding(torch.nn.Module):
+    """Applies RoPE to input tensor to inject positional information."""
+    def __init__(self, theta: float, d_k: int, max_seq_len: int, device: torch.device | None = None):
+        super().__init__()
+        self.theta = theta
+        self.d_k = d_k
+        self.max_seq_len = max_seq_len
+        angles = 1 / torch.pow(self.theta, (2 * torch.arange(1, self.d_k / 2 + 1) - 2) / self.d_k)
+        mat = torch.outer(torch.arange(self.max_seq_len), angles)
+        self.register_buffer(name="cos_vals", tensor=torch.cos(mat), persistent=False)
+        self.register_buffer(name="sin_vals", tensor=torch.sin(mat), persistent=False)
+        
+    def forward(self, x: torch.Tensor, token_positions: torch.Tensor) -> torch.Tensor:
+        cos_vals = self.cos_vals[token_positions]
+        sin_vals = self.sin_vals[token_positions]  
+        x = rearrange(x, '... (pairs two) -> ... pairs two', two=2)
+        x0 = x[..., 0]
+        x1 = x[..., 1]
+        new_x0 = x0 * cos_vals - x1 * sin_vals
+        new_x1 = x0 * sin_vals + x1 * cos_vals
+        return rearrange(torch.stack((new_x0, new_x1),dim=-1), '... pairs two -> ... (pairs two)')
+        
+    
