@@ -48,6 +48,7 @@ class Embedding(torch.nn.Module):
 
 class RMSNorm(torch.nn.Module):
     """Implements RMSNorm."""
+
     def __init__(
         self, d_model: int, eps: float = 1e-5, device: torch.device | None = None, dtype: torch.dtype | None = None
     ):
@@ -68,6 +69,18 @@ class RMSNorm(torch.nn.Module):
         return result.to(in_dtype)
 
 
-class SwiGLU():
-    """"""
-    def __init__()
+class SwiGLU(torch.nn.Module):
+    """Implements SwiGLU feed-forward network, composed of a SiLU activation function and a GLU."""
+
+    def __init__(self, d_model: int, d_ff: int | None = None):
+        super().__init__()
+        self.d_model = d_model
+        self.d_ff = d_ff if d_ff else ((8 / 3 * d_model) // 64 + 1) * 64
+        self.W1 = torch.nn.Parameter(torch.empty((self.d_ff, d_model)))
+        self.W2 = torch.nn.Parameter(torch.empty((d_model, self.d_ff)))
+        self.W3 = torch.nn.Parameter(torch.empty((self.d_ff, d_model)))
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        y = x @ self.W1.T
+        silu = y * torch.sigmoid(y)
+        return (silu * (x @ self.W3.T)) @ self.W2.T
