@@ -131,7 +131,7 @@ def scaled_dot_product_attention(
 
 
 class Attention(torch.nn.Module):
-    def __init__(self, d_model: int, num_heads: int, rope: RotaryPositionalEmbedding | None = None, token_positions: Int[Tensor, " ... sequence_length"] | None = None):
+    def __init__(self, d_model: int, num_heads: int, rope: RotaryPositionalEmbedding | None = None):
         super().__init__()
         self.d_model = d_model
         self.num_heads = num_heads
@@ -140,10 +140,11 @@ class Attention(torch.nn.Module):
         self.v_proj_weight = torch.nn.Parameter(torch.empty((d_model, d_model)))
         self.o_proj_weight = torch.nn.Parameter(torch.empty((d_model, d_model)))
         self.rope = rope
-        self.token_positions = token_positions
 
     def forward(
-        self, x: Float[Tensor, " ... sequence_length d_model"]
+        self,
+        x: Float[Tensor, " ... sequence_length d_model"],
+        token_positions: Float[Tensor, "batch sequence_length d_model"] | None = None,
     ) -> Float[Tensor, " ... sequence_length d_model"]:
         # apply causal masking
         seq_len = x.shape[-2]
@@ -151,12 +152,57 @@ class Attention(torch.nn.Module):
         q = rearrange(x @ self.q_proj_weight.T, "... seq_len (h d_k) -> ... h seq_len d_k", h=self.num_heads)
         k = rearrange(x @ self.k_proj_weight.T, "... seq_len (h d_k) -> ... h seq_len d_k", h=self.num_heads)
         v = rearrange(x @ self.v_proj_weight.T, "... seq_len (h d_v) -> ... h seq_len d_v", h=self.num_heads)
-        # apply rope 
+        # apply rope
         if self.rope is not None:
-            q = self.rope.forward(q, self.token_positions)
-            k = self.rope.forward(k, self.token_positions)
-        
+            q = self.rope.forward(q, token_positions)
+            k = self.rope.forward(k, token_positions)
+
         attention = rearrange(scaled_dot_product_attention(q, k, v, mask), "... h seq_len d_k -> ... seq_len (h d_k)")
-                              
+
         return attention @ self.o_proj_weight.T
 
+
+class TransformerBlock(torch.nn.Module):
+    def __init__(self, d_model: int, num_heads: int, d_ff: int, rope: RotaryPositionalEmbedding | None = None):
+        super().__init__()
+        self.norm1 = RMSNorm(d_model)
+        self.norm2 = RMSNorm(d_model)
+        self.ff = SwiGLU(d_model, d_ff)
+        self.attention = Attention(d_model, num_heads, rope)
+
+    def forward(self, x: Tensor, token_positions: Float[Tensor, "batch sequence_length d_model"] | None = None):
+        # first half
+        norm1 = self.norm1.forward(x)
+        first = x + self.attention.forward(norm1, token_positions)
+
+        # second half
+        norm2 = self.norm2.forward(first)
+        second = first + self.ff.forward(norm2)
+
+        return second
+
+
+class TransformerLM(torch.nn.Module):
+    def __init__(
+        self,
+        d_model: int,
+        num_heads: int,
+        d_ff: int,
+        vocab_size: int,
+        context_length: int,
+        num_layers: int,
+        rope: RotaryPositionalEmbedding | None = None,
+    ):
+        super().__init__()
+        self.embedding = Embedding(num_embeddings=vocab_size, embedding_dim=d_model)
+        self.layers = torch.nn.ModuleList([TransformerBlock(d_model, num_heads, d_ff, rope) for _ in range(num_layers)])
+        self.norm3 = RMSNorm(d_model)
+        self.linear = Linear(d_model, vocab_size)
+
+    def forward(self, x: Tensor, token_positions: Float[Tensor, "batch sequence_length d_model"] | None = None):
+        # token embeddings
+        x = self.embedding.forward(x)
+        for layer in self.layers:
+            x = layer.forward(x, token_positions)
+        x = self.norm3.forward(x)
+        return self.linear.forward(x)

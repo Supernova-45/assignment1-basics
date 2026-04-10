@@ -11,7 +11,18 @@ from torch import Tensor
 
 from src.tokenizer_training import train_bpe
 from src.tokenizer import Tokenizer
-from src.transformer_helpers import Linear, Embedding, RMSNorm, SwiGLU, RotaryPositionalEmbedding, softmax, scaled_dot_product_attention, Attention
+from src.transformer import (
+    Linear,
+    Embedding,
+    RMSNorm,
+    SwiGLU,
+    RotaryPositionalEmbedding,
+    softmax,
+    scaled_dot_product_attention,
+    Attention,
+    TransformerBlock,
+    TransformerLM,
+)
 
 
 def run_linear(
@@ -144,7 +155,14 @@ def run_multihead_self_attention(
         implementation with the given QKV projection weights and input features.
     """
     attention = Attention(d_model, num_heads)
-    attention.load_state_dict({"q_proj_weight": q_proj_weight, "k_proj_weight": k_proj_weight, "v_proj_weight": v_proj_weight, "o_proj_weight": o_proj_weight})
+    attention.load_state_dict(
+        {
+            "q_proj_weight": q_proj_weight,
+            "k_proj_weight": k_proj_weight,
+            "v_proj_weight": v_proj_weight,
+            "o_proj_weight": o_proj_weight,
+        }
+    )
     return attention.forward(in_features)
 
 
@@ -185,9 +203,16 @@ def run_multihead_self_attention_with_rope(
         Float[Tensor, " ... sequence_length d_model"]: Tensor with the output of running your optimized, batched multi-headed attention
         implementation with the given QKV projection weights and input features.
     """
-    attention = Attention(d_model, num_heads, rope=RotaryPositionalEmbedding(theta, d_model / num_heads, max_seq_len), token_positions=token_positions)
-    attention.load_state_dict({"q_proj_weight": q_proj_weight, "k_proj_weight": k_proj_weight, "v_proj_weight": v_proj_weight, "o_proj_weight": o_proj_weight})
-    return attention.forward(in_features)
+    attention = Attention(d_model, num_heads, rope=RotaryPositionalEmbedding(theta, d_model // num_heads, max_seq_len))
+    attention.load_state_dict(
+        {
+            "q_proj_weight": q_proj_weight,
+            "k_proj_weight": k_proj_weight,
+            "v_proj_weight": v_proj_weight,
+            "o_proj_weight": o_proj_weight,
+        }
+    )
+    return attention.forward(in_features, token_positions)
 
 
 def run_rope(
@@ -283,7 +308,24 @@ def run_transformer_block(
         Float[Tensor, "batch sequence_length d_model"] Tensor with the output of
         running the Transformer block on the input features while using RoPE.
     """
-    raise NotImplementedError
+    block = TransformerBlock(
+        d_model, num_heads, d_ff, RotaryPositionalEmbedding(theta, d_model // num_heads, max_seq_len)
+    )
+    block.norm1.load_state_dict({"gain": weights["ln1.weight"]})
+    block.norm2.load_state_dict({"gain": weights["ln2.weight"]})
+    block.ff.load_state_dict(
+        {"W1": weights["ffn.w1.weight"], "W2": weights["ffn.w2.weight"], "W3": weights["ffn.w3.weight"]}
+    )
+    block.attention.load_state_dict(
+        {
+            "q_proj_weight": weights["attn.q_proj.weight"],
+            "k_proj_weight": weights["attn.k_proj.weight"],
+            "v_proj_weight": weights["attn.v_proj.weight"],
+            "o_proj_weight": weights["attn.output_proj.weight"],
+        }
+    )
+    token_positions = torch.arange(in_features.shape[-2])
+    return block.forward(in_features, token_positions)
 
 
 def run_transformer_lm(
@@ -365,7 +407,40 @@ def run_transformer_lm(
         Float[Tensor, "batch_size sequence_length vocab_size"]: Tensor with the predicted unnormalized
         next-word distribution for each token.
     """
-    raise NotImplementedError
+    lm = TransformerLM(
+        d_model=d_model,
+        num_heads=num_heads,
+        d_ff=d_ff,
+        vocab_size=vocab_size,
+        context_length=context_length,
+        num_layers=num_layers,
+        rope=RotaryPositionalEmbedding(rope_theta, d_model // num_heads, max_seq_len=context_length),
+    )
+    lm.embedding.load_state_dict({"W": weights["token_embeddings.weight"]})
+    for i in range(num_layers):
+        block = lm.layers[i]
+        block.norm1.load_state_dict({"gain": weights[f"layers.{i}.ln1.weight"]})
+        block.norm2.load_state_dict({"gain": weights[f"layers.{i}.ln2.weight"]})
+        block.ff.load_state_dict(
+            {
+                "W1": weights[f"layers.{i}.ffn.w1.weight"],
+                "W2": weights[f"layers.{i}.ffn.w2.weight"],
+                "W3": weights[f"layers.{i}.ffn.w3.weight"],
+            }
+        )
+        block.attention.load_state_dict(
+            {
+                "q_proj_weight": weights[f"layers.{i}.attn.q_proj.weight"],
+                "k_proj_weight": weights[f"layers.{i}.attn.k_proj.weight"],
+                "v_proj_weight": weights[f"layers.{i}.attn.v_proj.weight"],
+                "o_proj_weight": weights[f"layers.{i}.attn.output_proj.weight"],
+            }
+        )
+    lm.norm3.load_state_dict({"gain": weights["ln_final.weight"]})
+    lm.linear.load_state_dict({"W": weights["lm_head.weight"]})
+
+    token_positions = torch.arange(in_indices.shape[-1])
+    return lm.forward(in_indices, token_positions)
 
 
 def run_rmsnorm(
@@ -443,7 +518,7 @@ def run_softmax(in_features: Float[Tensor, " ..."], dim: int) -> Float[Tensor, "
         Float[Tensor, "..."]: Tensor of with the same shape as `in_features` with the output of
         softmax normalizing the specified `dim`.
     """
-    return softmax(in_features, dim) 
+    return softmax(in_features, dim)
 
 
 def run_cross_entropy(
