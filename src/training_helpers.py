@@ -9,6 +9,9 @@ from typing import Optional
 import numpy.typing as npt
 import math
 
+from src.transformer import softmax, TransformerLM
+from src.tokenizer import Tokenizer
+
 
 def cross_entropy(
     inputs: Float[Tensor, " batch_size vocab_size"], targets: Int[Tensor, " batch_size"]
@@ -132,7 +135,7 @@ def save_checkpoint(
 ):
     model_state = model.state_dict()
     optimizer_state = optimizer.state_dict()
-    torch.save({"model_state" : model_state, "optimizer_state": optimizer_state, "iteration": iteration}, out)
+    torch.save({"model_state": model_state, "optimizer_state": optimizer_state, "iteration": iteration}, out)
 
 
 def load_checkpoint(
@@ -144,3 +147,37 @@ def load_checkpoint(
     model.load_state_dict(data["model_state"])
     optimizer.load_state_dict(data["optimizer_state"])
     return data["iteration"]
+
+
+def decode_lm(
+    model: TransformerLM,
+    prompt_tokens,
+    max_generated_tokens: int,
+    temperature: float,
+    top_p: float,
+    tokenizer: Tokenizer,
+):
+    decoded_text = ""
+    num_generated = 0
+    stop_token = tokenizer.encode("<|endoftext|>")[0]
+    token_positions =torch.arange(prompt_tokens.shape[1], device=prompt_tokens.device)
+    with torch.no_grad():
+        while num_generated < max_generated_tokens:
+            logits = model.forward(prompt_tokens, token_positions)[:, -1, :]
+
+            # apply temperature scaling
+            probs = softmax(logits / temperature, -1)
+            # apply nucleus / top p sampling
+            sorted_probs, sorted_indices = torch.sort(probs, descending=True)
+            sums = torch.cumsum(sorted_probs, dim=-1)
+            mask = sums - sorted_probs >= top_p
+            sorted_probs[mask] = 0
+            sorted_probs = sorted_probs / sorted_probs.sum()
+            next_token = sorted_indices[torch.multinomial(sorted_probs, num_samples=1)]
+            prompt_tokens = torch.cat([prompt_tokens, next_token.unsqueeze(0)], dim=-1)
+            decoded_text += tokenizer.decode([next_token.item()])
+            num_generated += 1
+            if next_token == stop_token:
+                return decoded_text
+
+    return decoded_text
