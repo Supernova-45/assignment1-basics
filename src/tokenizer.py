@@ -1,5 +1,7 @@
 from collections import defaultdict
 from collections.abc import Iterable, Iterator
+import time
+import numpy as np
 import regex as re
 import pickle
 
@@ -9,6 +11,9 @@ class Tokenizer:
         "Construct a tokenizer from a given vocabulary, list of merges, and (optionally) a list of special tokens."
         self.vocab = vocab
         self.merges = merges
+        self.merge_lookup = {}
+        for i, (left, right) in enumerate(merges):
+            self.merge_lookup[(left, right)] = (i, left + right)
         self.special_tokens = special_tokens or []
         self.special_token_set = set(self.special_tokens)
         # Construct reverse bytes to int
@@ -16,6 +21,10 @@ class Tokenizer:
         for k, v in vocab.items():
             self.reverse_vocab[v] = k
         self.base_pat = re.compile(r"""'(?:[sdmt]|ll|ve|re)| ?\p{L}+| ?\p{N}+| ?[^\s\p{L}\p{N}]+|\s+(?!\S)|\s+""")
+        if self.special_tokens:
+            self.special_pat = re.compile(
+                    "(" + "|".join(re.escape(tok) for tok in sorted(self.special_tokens, key=len, reverse=True)) + ")"
+                )
 
     @classmethod
     def from_files(cls, vocab_filepath: str, merges_filepath: str, special_tokens=None):
@@ -33,10 +42,7 @@ class Tokenizer:
 
         # Split around special tokens first
         if self.special_tokens:
-            special_pat = re.compile(
-                "(" + "|".join(re.escape(tok) for tok in sorted(self.special_tokens, key=len, reverse=True)) + ")"
-            )
-            parts = [p for p in special_pat.split(text) if p != ""]
+            parts = [p for p in self.special_pat.split(text) if p != ""]
         else:
             parts = [text]
 
@@ -49,24 +55,27 @@ class Tokenizer:
                 for pretok in self.base_pat.findall(part):
                     tokens.append([bytes([b]) for b in pretok.encode("utf-8")])
 
-        # Apply merges only to normal tokens
-        for merge in self.merges:
-            for idx, token in enumerate(tokens):
-                if isinstance(token, str):  # special token
-                    continue
-                if len(token) <= 1:
-                    continue
+        # Apply merges to each normal token
+        for idx, token in enumerate(tokens):
+            if isinstance(token, str):  # special token, skip
+                continue
 
-                i = 0
-                new_token = []
-                while i < len(token):
-                    if i + 1 < len(token) and token[i] == merge[0] and token[i + 1] == merge[1]:
-                        new_token.append(token[i] + token[i + 1])
-                        i += 2
-                    else:
-                        new_token.append(token[i])
-                        i += 1
-                tokens[idx] = new_token
+            parts = token  # already a list of bytes from pre-tokenization
+            while len(parts) > 1:
+                best_rank = float('inf')
+                best_idx = -1
+                for i in range(len(parts) - 1):
+                    pair = (parts[i], parts[i + 1])
+                    if pair in self.merge_lookup:
+                        rank = self.merge_lookup[pair][0]
+                        if rank < best_rank:
+                            best_rank = rank
+                            best_idx = i
+                if best_idx == -1:
+                    break
+                parts[best_idx] = parts[best_idx] + parts[best_idx + 1]
+                parts.pop(best_idx + 1)
+            tokens[idx] = parts
 
         # Convert to ids
         result = []
@@ -90,3 +99,78 @@ class Tokenizer:
         for i in ids:
             decoded += self.vocab[i]
         return decoded.decode("utf-8", errors="replace")
+
+
+def get_compression_ratio():
+    # sample 10 documents from TinyStories and OpenWebText
+    tiny_stories_docs = []
+    with open("data/raw_data/TinyStoriesV2-GPT4-valid.txt", "r") as f:
+        curr_doc = ""
+        for line in f:
+            if "<|endoftext|>" in line:
+                tiny_stories_docs.append(curr_doc)
+                curr_doc = ""
+                if len(tiny_stories_docs) >= 10:
+                    break
+            else:
+                curr_doc += line
+              
+    owt_docs = []
+    with open("data/raw_data/owt_valid.txt", "r") as f:
+        curr_doc = ""
+        for line in f:
+            if "<|endoftext|>" in line:
+                owt_docs.append(curr_doc)
+                curr_doc = ""
+                if len(owt_docs) >= 10:
+                    break
+            else:
+                curr_doc += line
+    
+    tiny_stories_tokenizer = Tokenizer.from_files("output/output_tiny_bpe/vocab.pkl", "output/output_tiny_bpe/merges.pkl")
+    tiny_stories_bytes = 0
+    tiny_stories_tokens = 0
+    for i in range(10):
+        tiny_stories_bytes += len(tiny_stories_docs[i].encode('utf-8'))
+        tiny_stories_tokens += len(tiny_stories_tokenizer.encode(tiny_stories_docs[i]))
+    
+    print(f"Tiny stories compression ratio: {tiny_stories_bytes / tiny_stories_tokens}")
+    
+    owt_tokenizer = Tokenizer.from_files("output/output_owt_bpe/vocab.pkl", "output/output_owt_bpe/merges.pkl")
+    owt_bytes = 0
+    owt_tokens = 0
+    
+    start = time.time()
+    for i in range(10):
+        owt_bytes += len(owt_docs[i].encode('utf-8'))
+        owt_tokenizer.encode(owt_docs[i])
+    
+    elapsed = time.time() - start
+    
+    # OWT compression ratio: {owt_bytes / owt_tokens},
+    print(f"bytes / seconds: {owt_bytes / elapsed}")
+    
+    
+def encode_dataset(tokenizer, input_path, output_path):
+    with open(input_path, "r") as f, open(output_path, "wb") as out:
+        chunk = []
+        for token_id in tokenizer.encode_iterable(f):
+            chunk.append(token_id)
+            if len(chunk) >= 1000000:
+                np.array(chunk, dtype=np.uint16).tofile(out)
+                chunk = []
+        if chunk:
+            np.array(chunk, dtype=np.uint16).tofile(out)
+            
+def main():
+    tiny_tokenizer = Tokenizer.from_files("output/output_tiny_bpe/vocab.pkl", "output/output_tiny_bpe/merges.pkl", ["<|endoftext|>"])
+    owt_tokenizer = Tokenizer.from_files("output/output_owt_bpe/vocab.pkl", "output/output_owt_bpe/merges.pkl", ["<|endoftext|>"])
+
+    encode_dataset(tiny_tokenizer, "data/raw_data/TinyStoriesV2-GPT4-train.txt", "output/tiny_train.bin")
+    encode_dataset(tiny_tokenizer, "data/raw_data/TinyStoriesV2-GPT4-valid.txt", "output/tiny_valid.bin")
+    encode_dataset(owt_tokenizer, "data/raw_data/owt_train.txt", "output/owt_train.bin")
+    encode_dataset(owt_tokenizer, "data/raw_data/owt_valid.txt", "output/owt_valid.bin")
+            
+        
+if __name__ == "__main__":
+    main()
