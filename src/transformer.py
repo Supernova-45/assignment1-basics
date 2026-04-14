@@ -78,9 +78,13 @@ class SwiGLU(torch.nn.Module):
         super().__init__()
         self.d_model = d_model
         self.d_ff = d_ff if d_ff else ((8 / 3 * d_model) // 64 + 1) * 64
+        std = math.sqrt(2 / (d_model + d_ff))
         self.W1 = torch.nn.Parameter(torch.empty((self.d_ff, d_model)))
+        torch.nn.init.trunc_normal_(self.W1, mean=0, std=std, a=-3 * std, b=3 * std)
         self.W2 = torch.nn.Parameter(torch.empty((d_model, self.d_ff)))
+        torch.nn.init.trunc_normal_(self.W2, mean=0, std=std, a=-3 * std, b=3 * std)
         self.W3 = torch.nn.Parameter(torch.empty((self.d_ff, d_model)))
+        torch.nn.init.trunc_normal_(self.W3, mean=0, std=std, a=-3 * std, b=3 * std)
 
     def forward(self, x: Tensor) -> Tensor:
         y = x @ self.W1.T
@@ -135,10 +139,15 @@ class Attention(torch.nn.Module):
         super().__init__()
         self.d_model = d_model
         self.num_heads = num_heads
+        std = math.sqrt(2 / (d_model + d_model))
         self.q_proj_weight = torch.nn.Parameter(torch.empty((d_model, d_model)))
+        torch.nn.init.trunc_normal_(self.q_proj_weight, mean=0, std=std, a=-3 * std, b=3 * std)
         self.k_proj_weight = torch.nn.Parameter(torch.empty((d_model, d_model)))
+        torch.nn.init.trunc_normal_(self.k_proj_weight, mean=0, std=std, a=-3 * std, b=3 * std)
         self.v_proj_weight = torch.nn.Parameter(torch.empty((d_model, d_model)))
+        torch.nn.init.trunc_normal_(self.v_proj_weight, mean=0, std=std, a=-3 * std, b=3 * std)
         self.o_proj_weight = torch.nn.Parameter(torch.empty((d_model, d_model)))
+        torch.nn.init.trunc_normal_(self.o_proj_weight, mean=0, std=std, a=-3 * std, b=3 * std)
         self.rope = rope
 
     def forward(
@@ -148,7 +157,7 @@ class Attention(torch.nn.Module):
     ) -> Float[Tensor, " ... sequence_length d_model"]:
         # apply causal masking
         seq_len = x.shape[-2]
-        mask = torch.tril(torch.ones(seq_len, seq_len), diagonal=0).bool()
+        mask = torch.tril(torch.ones(seq_len, seq_len, device=x.device), diagonal=0).bool()
         q = rearrange(x @ self.q_proj_weight.T, "... seq_len (h d_k) -> ... h seq_len d_k", h=self.num_heads)
         k = rearrange(x @ self.k_proj_weight.T, "... seq_len (h d_k) -> ... h seq_len d_k", h=self.num_heads)
         v = rearrange(x @ self.v_proj_weight.T, "... seq_len (h d_v) -> ... h seq_len d_v", h=self.num_heads)

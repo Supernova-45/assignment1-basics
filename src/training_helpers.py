@@ -122,8 +122,8 @@ def get_batch(
     dataset: npt.NDArray, batch_size: int, context_length: int, device: str
 ) -> tuple[torch.Tensor, torch.Tensor]:
     positions = torch.randint(dataset.shape[0] - context_length, (batch_size,))
-    inputs = torch.stack([torch.tensor(dataset[i : i + context_length], device=device) for i in positions])
-    targets = torch.stack([torch.tensor(dataset[i + 1 : i + context_length + 1], device=device) for i in positions])
+    inputs = torch.stack([torch.tensor(dataset[i : i + context_length], dtype=torch.long, device=device) for i in positions])
+    targets = torch.stack([torch.tensor(dataset[i + 1 : i + context_length + 1], dtype=torch.long, device=device) for i in positions])
     return (inputs, targets)
 
 
