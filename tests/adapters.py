@@ -23,7 +23,15 @@ from src.transformer import (
     TransformerBlock,
     TransformerLM,
 )
-from src.training_helpers import cross_entropy, AdamW, lr_cosine_schedule, gradient_clipping, get_batch, load_checkpoint, save_checkpoint
+from src.training_helpers import (
+    cross_entropy,
+    AdamW,
+    lr_cosine_schedule,
+    gradient_clipping,
+    get_batch,
+    load_checkpoint,
+    save_checkpoint,
+)
 
 
 def run_linear(
@@ -480,7 +488,7 @@ def run_silu(in_features: Float[Tensor, " ..."]) -> Float[Tensor, " ..."]:
         Float[Tensor,"..."]: of with the same shape as `in_features` with the output of applying
         SiLU to each element.
     """
-    raise NotImplementedError
+    return in_features * torch.sigmoid(in_features)
 
 
 def run_get_batch(
@@ -603,7 +611,7 @@ def run_save_checkpoint(
             we've completed.
         out (str | os.PathLike | BinaryIO | IO[bytes]): Path or file-like object to serialize the model, optimizer, and iteration to.
     """
-    return save_checkpoint(model, optimizer, iteration, out) 
+    return save_checkpoint(model, optimizer, iteration, out)
 
 
 def run_load_checkpoint(
