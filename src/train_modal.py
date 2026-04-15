@@ -11,10 +11,10 @@ wandb_secret = modal.Secret.from_name("wandb")
     volumes=VOLUME_MOUNTS,
     gpu="B200",
     secrets=[wandb_secret],
-    timeout=7200,
-    max_containers=5,
+    timeout=21600,
+    max_containers=4,
 )
-def train(lr: float):
+def train(config):
     import numpy as np
     import torch
     import time
@@ -36,33 +36,13 @@ def train(lr: float):
     wandb.init(
         entity="alexandrasuriya-ml",
         project="cs336-a1",
-        config={
-            "d_model": 512,
-            "num_heads": 16,
-            "num_layers": 4,
-            "d_ff": 4 * 512,
-            "vocab_size": 10000,
-            "context_length": 256,
-            "rope_theta": 10000.0,
-            "lr": lr,
-            "lr_min": 1e-4,
-            "warmup_steps": 500,
-            "betas": [0.9, 0.999],
-            "eps": 1e-8,
-            "weight_decay": 0.01,
-            "num_steps": 10000,
-            "batch_size": 128,
-            "max_grad_norm": 1.0,
-            "device": "cuda",
-            "architecture": "TransformerLM",
-            "checkpoint_path": str(DATA_PATH / "checkpoints" / f"no_rmsnorm_lr_{lr}.pt"),
-        },
+        config=config,
     )
     cfg = wandb.config
 
     # Use DATA_PATH for data
-    train_data = np.memmap(str(DATA_PATH / "tokenized" / "tiny_train.bin"), dtype=np.uint16, mode="r")
-    val_data = np.memmap(str(DATA_PATH / "tokenized" / "tiny_valid.bin"), dtype=np.uint16, mode="r")
+    train_data = np.memmap(str(DATA_PATH / "tokenized" / "owt_train.bin"), dtype=np.uint16, mode="r")
+    val_data = np.memmap(str(DATA_PATH / "tokenized" / "owt_valid.bin"), dtype=np.uint16, mode="r")
 
     rope = RotaryPositionalEmbedding(cfg.rope_theta, cfg.d_model // cfg.num_heads, max_seq_len=cfg.context_length)
     lm = TransformerLM(
@@ -128,10 +108,119 @@ def train(lr: float):
 
 @app.local_entrypoint()
 def main():
-    lr = [0.0001, 0.0005, 0.001, 0.005, 0.01]
-    for result in train.map(lr):
+    lrs = [0.001, 0.005, 0.007, 0.008, 0.009, 0.01, 0.015, 0.02]
+    lr_configs = [
+        {
+            "d_model": 512,
+            "num_heads": 16,
+            "num_layers": 4,
+            "d_ff": 1344,
+            "vocab_size": 32000,
+            "context_length": 512,
+            "rope_theta": 10000.0,
+            "lr": lr,
+            "lr_min": 1e-4,
+            "warmup_steps": 500,
+            "betas": [0.9, 0.999],
+            "eps": 1e-8,
+            "weight_decay": 0.01,
+            "num_steps": 10000,
+            "batch_size": 256,
+            "max_grad_norm": 1.0,
+            "device": "cuda",
+            "architecture": "TransformerLM",
+            "checkpoint_path": str(DATA_PATH / "checkpoints" / f"owt_{lr}.pt"),
+        }
+        for lr in lrs
+    ]
+    for result in train.map(lr_configs):
         print(result)
-
+        
+    batch_sizes = [64, 128, 256, 512]
+    batch_size_configs = [
+        {
+            "d_model": 512,
+            "num_heads": 16,
+            "num_layers": 4,
+            "d_ff": 1344,
+            "vocab_size": 32000,
+            "context_length": 512,
+            "rope_theta": 10000.0,
+            "lr": 0.008,
+            "lr_min": 1e-4,
+            "warmup_steps": 500,
+            "betas": [0.9, 0.999],
+            "eps": 1e-8,
+            "weight_decay": 0.01,
+            "num_steps": 10000,
+            "batch_size": batch_size,
+            "max_grad_norm": 1.0,
+            "device": "cuda",
+            "architecture": "TransformerLM",
+            "checkpoint_path": str(DATA_PATH / "checkpoints" / f"owt_{batch_size}.pt"),
+        }
+        for batch_size in batch_sizes
+    ]
+    for result in train.map(batch_size_configs):
+        print(result)
+        
+    warmup_steps = [100, 200, 500, 1000]
+    warmup_step_configs = [
+        {
+            "d_model": 512,
+            "num_heads": 16,
+            "num_layers": 4,
+            "d_ff": 1344,
+            "vocab_size": 32000,
+            "context_length": 512,
+            "rope_theta": 10000.0,
+            "lr": 0.008,
+            "lr_min": 1e-4,
+            "warmup_steps": warmup_step,
+            "betas": [0.9, 0.999],
+            "eps": 1e-8,
+            "weight_decay": 0.01,
+            "num_steps": 10000,
+            "batch_size": 256,
+            "max_grad_norm": 1.0,
+            "device": "cuda",
+            "architecture": "TransformerLM",
+            "checkpoint_path": str(DATA_PATH / "checkpoints" / f"owt_{warmup_step}.pt"),
+        }
+        for warmup_step in warmup_steps
+    ]
+    for result in train.map(warmup_step_configs):
+        print(result)
+    
+    weight_decays = [0.0, 0.001, 0.01, 0.05, 0.1]
+    weight_decay_configs = [
+        {
+            "d_model": 512,
+            "num_heads": 16,
+            "num_layers": 4,
+            "d_ff": 1344,
+            "vocab_size": 32000,
+            "context_length": 512,
+            "rope_theta": 10000.0,
+            "lr": 0.008,
+            "lr_min": 1e-4,
+            "warmup_steps": 500,
+            "betas": [0.9, 0.999],
+            "eps": 1e-8,
+            "weight_decay": weight_decay,
+            "num_steps": 10000,
+            "batch_size": 256,
+            "max_grad_norm": 1.0,
+            "device": "cuda",
+            "architecture": "TransformerLM",
+            "checkpoint_path": str(DATA_PATH / "checkpoints" / f"owt_{weight_decay}.pt"),
+        }
+        for weight_decay in weight_decays
+    ]
+    for result in train.map(weight_decay_configs):
+        print(result)
+        
+    
 
 if __name__ == "__main__":
     main()

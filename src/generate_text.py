@@ -25,26 +25,23 @@ def generate():
     lm = TransformerLM(
         d_model=512,
         num_heads=16,
-        d_ff=1344,
-        vocab_size=10000,
+        d_ff=2048,
+        vocab_size=32000,
         context_length=256,
         num_layers=4,
         rope=rope,
     )
     lm.to(device=device)
     optimizer = AdamW(lm.parameters(), 0.008, [0.9, 0.999], 1e-8, 0.01)
-    data = torch.load(str(DATA_PATH / "checkpoints" / "bs_256.pt"))
-    no_compile = {k.replace("_orig_mod.", ""): v for k, v in data["model_state"].items()}
-    lm.load_state_dict(no_compile)
-    optimizer.load_state_dict(data["optimizer_state"])
+    load_checkpoint(str(DATA_PATH / "checkpoints" / "owt_0.008.pt"), lm, optimizer)
 
     tokenizer = Tokenizer.from_files(
-        str(DATA_PATH / "output_tiny_bpe" / "vocab.pkl"),
-        str(DATA_PATH / "output_tiny_bpe" / "merges.pkl"),
+        str(DATA_PATH / "output_owt_bpe" / "vocab.pkl"),
+        str(DATA_PATH / "output_owt_bpe" / "merges.pkl"),
         ["<|endoftext|>"],
     )
 
-    prompt = "Once upon a time"
+    prompt = "Anna"
     prompt_tokens = torch.tensor([tokenizer.encode(prompt)], dtype=torch.long, device=device)
     temperatures = [0.5, 0.6, 0.7, 0.8]
     top_ps = [0.8, 0.85, 0.9, 0.95]
@@ -52,7 +49,7 @@ def generate():
         for top_p in top_ps:
             text = decode_lm(lm, prompt_tokens, 256, temp, top_p, tokenizer)
             print(f"Temperature: {temp}; top_p: {top_p}")
-            print(f"Once upon a time {text}")
+            print(f"Anna {text}")
     return
 
 

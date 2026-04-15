@@ -186,7 +186,7 @@ class TransformerBlock(torch.nn.Module):
 
         # second half
         norm2 = self.norm2.forward(first)
-        second = first + norm2 * torch.sigmoid(norm2)
+        second = first + self.ff.forward(norm2)
 
         return second
 

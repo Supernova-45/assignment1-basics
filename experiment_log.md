@@ -114,3 +114,30 @@ With nope (lr = 0.005, tuned), we get a validation loss of 1.385. With rope (lr 
 0.001	1.6242971420288086
 0.0005	1.7637431621551514
 0.0001	1.9963139295578003
+
+# Tuning OWT
+
+1. LR sweep
+
+"d_model": 512,
+"num_heads": 16,
+"num_layers": 4,
+"d_ff": 4 * 512,
+"vocab_size": 10000,
+"context_length": 256,
+"rope_theta": 10000.0,
+"lr": lr,
+"lr_min": 1e-4,
+"warmup_steps": 500,
+"betas": [0.9, 0.999],
+"eps": 1e-8,
+"weight_decay": 0.01,
+"num_steps": 10000,
+"batch_size": 256,
+"max_grad_norm": 1.0,
+
+0.015	3.4413485527038574
+0.01	5.174596786499023
+0.008	3.430220127105713
+0.001	3.537924289703369
+0.005	3.4633750915527344
