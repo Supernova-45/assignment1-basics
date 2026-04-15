@@ -160,9 +160,9 @@ def decode_lm(
     decoded_text = ""
     num_generated = 0
     stop_token = tokenizer.encode("<|endoftext|>")[0]
-    token_positions =torch.arange(prompt_tokens.shape[1], device=prompt_tokens.device)
     with torch.no_grad():
         while num_generated < max_generated_tokens:
+            token_positions = torch.arange(prompt_tokens.shape[-1], device=prompt_tokens.device)
             logits = model.forward(prompt_tokens, token_positions)[:, -1, :]
 
             # apply temperature scaling
@@ -173,11 +173,14 @@ def decode_lm(
             mask = sums - sorted_probs >= top_p
             sorted_probs[mask] = 0
             sorted_probs = sorted_probs / sorted_probs.sum()
-            next_token = sorted_indices[torch.multinomial(sorted_probs, num_samples=1)]
-            prompt_tokens = torch.cat([prompt_tokens, next_token.unsqueeze(0)], dim=-1)
+            sampled = torch.multinomial(sorted_probs, num_samples=1)
+            next_token = sorted_indices.gather(-1, sampled)
+            prompt_tokens = torch.cat([prompt_tokens, next_token], dim=-1)
             decoded_text += tokenizer.decode([next_token.item()])
             num_generated += 1
+            
             if next_token == stop_token:
                 return decoded_text
+            
 
     return decoded_text

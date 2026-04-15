@@ -14,7 +14,7 @@ wandb_secret = modal.Secret.from_name("wandb")
     timeout=7200,
     max_containers=5,
 )
-def train(lr: float):
+def train(batch_size: float):
     import numpy as np
     import torch
     import time
@@ -31,7 +31,7 @@ def train(lr: float):
     )
 
     os.makedirs(str(DATA_PATH / "checkpoints"), exist_ok=True)
-    
+
     # config
     wandb.init(
         entity="alexandrasuriya-ml",
@@ -44,18 +44,18 @@ def train(lr: float):
             "vocab_size": 10000,
             "context_length": 256,
             "rope_theta": 10000.0,
-            "lr": lr,
+            "lr": 0.008,
             "lr_min": 1e-4,
             "warmup_steps": 500,
             "betas": [0.9, 0.999],
             "eps": 1e-8,
             "weight_decay": 0.01,
             "num_steps": 10000,
-            "batch_size": 128,
+            "batch_size": batch_size,
             "max_grad_norm": 1.0,
             "device": "cuda",
             "architecture": "TransformerLM",
-            "checkpoint_path": str(DATA_PATH / "checkpoints" / f"lr_{lr}.pt"),
+            "checkpoint_path": str(DATA_PATH / "checkpoints" / f"bs_{batch_size}.pt"),
         },
     )
     cfg = wandb.config
@@ -119,7 +119,7 @@ def train(lr: float):
         if t % 1000 == 0:
             save_checkpoint(lm, optimizer, t, cfg.checkpoint_path)
 
-    save_checkpoint(lm, optimizer, t, cfg.checkpoint_path)
+    save_checkpoint(lm._orig_mod, optimizer, t, cfg.checkpoint_path)
 
     user_volume = modal.Volume.from_name("basics-alexskim")
     user_volume.commit()
@@ -128,9 +128,10 @@ def train(lr: float):
 
 @app.local_entrypoint()
 def main():
-    lrs = [0.0075, 0.0085, 0.009, 0.05, 0.1]
-    for result in train.map(lrs):
+    batch_sizes = [256]
+    for result in train.map(batch_sizes):
         print(result)
+
 
 if __name__ == "__main__":
     main()
