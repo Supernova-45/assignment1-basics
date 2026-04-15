@@ -97,3 +97,6 @@ Using a learning rate of 0.005 diverged. Here are the other learning rates and v
 0.0001	1.8778798580169678
 0.00005	1.9859403371810913
 0.00001	2.0537354946136475
+
+## Experiment 4: Tried Post-Norm
+Of 0.0001, 0.0005, 0.001 -- 0.001 was the optimal learning rate and led to a final validation loss of around 1.35.

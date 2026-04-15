@@ -128,7 +128,7 @@ def train(lr: float):
 
 @app.local_entrypoint()
 def main():
-    lr = [1e-5, 5e-5, 1e-4, 5e-4, 1e-3]
+    lr = [0.0001, 0.0005, 0.001]
     for result in train.map(lr):
         print(result)
 

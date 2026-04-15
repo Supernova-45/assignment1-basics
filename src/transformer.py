@@ -181,16 +181,13 @@ class TransformerBlock(torch.nn.Module):
 
     def forward(self, x: Tensor, token_positions: Float[Tensor, "batch sequence_length d_model"] | None = None):
         # first half
-        # norm1 = self.norm1.forward(x)
-        # first = x + self.attention.forward(norm1, token_positions)
         first = x + self.attention.forward(x, token_positions)
-
+        norm1 = self.norm1.forward(first)
         # second half
-        # norm2 = self.norm2.forward(first)
-        # second = first + self.ff.forward(norm2)
-        second = first + self.ff.forward(first)
+        second = norm1 + self.ff.forward(norm1)
+        norm2 = self.norm2.forward(second)
 
-        return second
+        return norm2
 
 
 class TransformerLM(torch.nn.Module):
@@ -215,5 +212,5 @@ class TransformerLM(torch.nn.Module):
         x = self.embedding.forward(x)
         for layer in self.layers:
             x = layer.forward(x, token_positions)
-        # x = self.norm3.forward(x)
+        x = self.norm3.forward(x)
         return self.linear.forward(x)
