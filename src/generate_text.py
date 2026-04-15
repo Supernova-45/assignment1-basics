@@ -21,19 +21,19 @@ def generate():
 
     device = "cuda"
 
-    rope = RotaryPositionalEmbedding(10000.0, 512 // 16, max_seq_len=256)
+    rope = RotaryPositionalEmbedding(10000.0, 512 // 16, max_seq_len=512)
     lm = TransformerLM(
         d_model=512,
         num_heads=16,
-        d_ff=2048,
+        d_ff=1344,
         vocab_size=32000,
-        context_length=256,
+        context_length=512,
         num_layers=4,
         rope=rope,
     )
     lm.to(device=device)
     optimizer = AdamW(lm.parameters(), 0.008, [0.9, 0.999], 1e-8, 0.01)
-    load_checkpoint(str(DATA_PATH / "checkpoints" / "owt_0.008.pt"), lm, optimizer)
+    load_checkpoint(str(DATA_PATH / "checkpoints" / "owt_0.007.pt"), lm, optimizer)
 
     tokenizer = Tokenizer.from_files(
         str(DATA_PATH / "output_owt_bpe" / "vocab.pkl"),
