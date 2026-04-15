@@ -14,7 +14,7 @@ wandb_secret = modal.Secret.from_name("wandb")
     timeout=7200,
     max_containers=5,
 )
-def train(batch_size: float):
+def train(lr: float):
     import numpy as np
     import torch
     import time
@@ -44,18 +44,18 @@ def train(batch_size: float):
             "vocab_size": 10000,
             "context_length": 256,
             "rope_theta": 10000.0,
-            "lr": 0.008,
+            "lr": lr,
             "lr_min": 1e-4,
             "warmup_steps": 500,
             "betas": [0.9, 0.999],
             "eps": 1e-8,
             "weight_decay": 0.01,
             "num_steps": 10000,
-            "batch_size": batch_size,
+            "batch_size": 128,
             "max_grad_norm": 1.0,
             "device": "cuda",
             "architecture": "TransformerLM",
-            "checkpoint_path": str(DATA_PATH / "checkpoints" / f"bs_{batch_size}.pt"),
+            "checkpoint_path": str(DATA_PATH / "checkpoints" / f"no_rmsnorm_lr_{lr}.pt"),
         },
     )
     cfg = wandb.config
@@ -128,8 +128,8 @@ def train(batch_size: float):
 
 @app.local_entrypoint()
 def main():
-    batch_sizes = [256]
-    for result in train.map(batch_sizes):
+    lr = [1e-5, 5e-5, 1e-4, 5e-4, 1e-3]
+    for result in train.map(lr):
         print(result)
 
 
