@@ -55,7 +55,7 @@ def train(lr: float):
             "max_grad_norm": 1.0,
             "device": "cuda",
             "architecture": "TransformerLM",
-            "checkpoint_path": str(DATA_PATH / "checkpoints" / f"no_rmsnorm_lr_{lr}.pt"),
+            "checkpoint_path": str(DATA_PATH / "checkpoints" / f"nope_lr_{lr}.pt"),
         },
     )
     cfg = wandb.config
@@ -64,7 +64,7 @@ def train(lr: float):
     train_data = np.memmap(str(DATA_PATH / "tokenized" / "tiny_train.bin"), dtype=np.uint16, mode="r")
     val_data = np.memmap(str(DATA_PATH / "tokenized" / "tiny_valid.bin"), dtype=np.uint16, mode="r")
 
-    rope = RotaryPositionalEmbedding(cfg.rope_theta, cfg.d_model // cfg.num_heads, max_seq_len=cfg.context_length)
+    # num_heads, max_seq_len=cfg.context_length)
     lm = TransformerLM(
         d_model=cfg.d_model,
         num_heads=cfg.num_heads,
@@ -72,7 +72,6 @@ def train(lr: float):
         vocab_size=cfg.vocab_size,
         context_length=cfg.context_length,
         num_layers=cfg.num_layers,
-        rope=rope,
     )
     lm.to(device=cfg.device)
     lm = torch.compile(lm)
@@ -128,7 +127,7 @@ def train(lr: float):
 
 @app.local_entrypoint()
 def main():
-    lr = [0.0001, 0.0005, 0.001]
+    lr = [0.0005, 0.001, 0.005, 0.01]
     for result in train.map(lr):
         print(result)
 

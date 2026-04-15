@@ -100,3 +100,10 @@ Using a learning rate of 0.005 diverged. Here are the other learning rates and v
 
 ## Experiment 4: Tried Post-Norm
 Of 0.0001, 0.0005, 0.001 -- 0.001 was the optimal learning rate and led to a final validation loss of around 1.35.
+
+## Experiment 5: Remove NoPE
+With nope (lr = 0.005, tuned), we get a validation loss of 1.385. With rope (lr = 0.008), we get a validation loss of 1.31.
+
+0.005	1.3851025104522705
+0.001	1.4075020551681519
+0.0005	1.5003514289855957
