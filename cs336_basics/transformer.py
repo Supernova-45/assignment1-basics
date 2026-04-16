@@ -79,7 +79,6 @@ class SwiGLU(torch.nn.Module):
 
     def __init__(self, d_model: int, d_ff: int | None = None):
         super().__init__()
-        self.d_model = d_model
         self.d_ff = d_ff if d_ff else ((8 / 3 * d_model) // 64 + 1) * 64
         std = math.sqrt(2 / (d_model + self.d_ff))
         self.W1 = torch.nn.Parameter(torch.empty((self.d_ff, d_model)))
@@ -93,6 +92,20 @@ class SwiGLU(torch.nn.Module):
         y = x @ self.W1.T
         silu = y * torch.sigmoid(y)
         return (silu * (x @ self.W3.T)) @ self.W2.T
+
+
+class ReLUSquared(torch.nn.Module):
+    def __init__(self, d_model: int, d_ff: int | None = None):
+        super().__init__()
+        self.d_ff = d_ff if d_ff else (4 * d_model)
+        std = math.sqrt(2 / (d_model + self.d_ff))
+        self.W1 = torch.nn.Parameter(torch.empty((self.d_ff, d_model)))
+        torch.nn.init.trunc_normal_(self.W1, mean=0, std=std, a=-3 * std, b=3 * std)
+        self.W2 = torch.nn.Parameter(torch.empty((d_model, self.d_ff)))
+        torch.nn.init.trunc_normal_(self.W2, mean=0, std=std, a=-3 * std, b=3 * std)
+        
+    def forward(self, x: Tensor) -> Tensor:
+        return (torch.relu(x @ self.W1.T) ** 2) @ self.W2.T
 
 
 class RotaryPositionalEmbedding(torch.nn.Module):
@@ -182,12 +195,16 @@ class TransformerBlock(torch.nn.Module):
         num_heads: int,
         d_ff: int,
         context_length: int,
+        use_relu: bool | None = False,
         rope: RotaryPositionalEmbedding | None = None,
     ):
         super().__init__()
         self.norm1 = RMSNorm(d_model)
         self.norm2 = RMSNorm(d_model)
-        self.ff = SwiGLU(d_model, d_ff)
+        if use_relu:
+            self.ff = ReLUSquared(d_model, d_ff)
+        else:
+            self.ff = SwiGLU(d_model, d_ff)
         self.attention = Attention(d_model, num_heads, context_length, rope)
 
     def forward(self, x: Tensor, token_positions: Float[Tensor, "batch sequence_length d_model"] | None = None):
@@ -212,13 +229,14 @@ class TransformerLM(torch.nn.Module):
         context_length: int,
         num_layers: int,
         tie_embeddings: bool | None = False,
+        use_relu: bool | None = False,
         rope: RotaryPositionalEmbedding | None = None,
     ):
         super().__init__()
         self.d_model = d_model
         self.embedding = Embedding(num_embeddings=vocab_size, embedding_dim=d_model, tie_embeddings=tie_embeddings)
         self.layers = torch.nn.ModuleList(
-            [TransformerBlock(d_model, num_heads, d_ff, context_length, rope) for _ in range(num_layers)]
+            [TransformerBlock(d_model, num_heads, d_ff, context_length, use_relu, rope) for _ in range(num_layers)]
         )
         self.norm3 = RMSNorm(d_model)
         self.linear = Linear(d_model, vocab_size)
