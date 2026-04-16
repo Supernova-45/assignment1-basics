@@ -100,6 +100,42 @@ def train(config):
             save_checkpoint(lm, optimizer, t, cfg.checkpoint_path)
 
     save_checkpoint(lm._orig_mod, optimizer, t, cfg.checkpoint_path)
+    # final val loss check
+    with torch.no_grad():
+        total_loss = 0.0
+        total_tokens = 0
+
+        max_start = len(val_data) - cfg.context_length - 1
+        starts = list(range(0, max_start + 1, cfg.context_length))
+
+        for j in range(0, len(starts), cfg.batch_size):
+            batch_starts = starts[j : j + cfg.batch_size]
+
+            val_inputs = torch.stack([
+                torch.tensor(val_data[s : s + cfg.context_length], dtype=torch.long, device=cfg.device)
+                for s in batch_starts
+            ])
+            val_targets = torch.stack([
+                torch.tensor(val_data[s + 1 : s + cfg.context_length + 1], dtype=torch.long, device=cfg.device)
+                for s in batch_starts
+            ])
+
+            token_positions = torch.arange(val_inputs.shape[1], device=cfg.device)
+            val_logits = lm(val_inputs, token_positions)
+
+            batch_loss = cross_entropy(
+                rearrange(val_logits, "b t v -> (b t) v"),
+                rearrange(val_targets, "b t -> (b t)")
+            )
+
+            n_tokens = val_targets.numel()
+            total_loss += batch_loss.item() * n_tokens
+            total_tokens += n_tokens
+
+        val_final_loss = total_loss / total_tokens
+        wandb.log({
+            "val_final_loss": val_final_loss
+        })
 
     user_volume = modal.Volume.from_name("basics-alexskim")
     user_volume.commit()
@@ -108,6 +144,7 @@ def train(config):
 
 @app.local_entrypoint()
 def main():
+    """
     lrs = [0.001, 0.005, 0.007, 0.008, 0.009, 0.01, 0.015, 0.02]
     lr_configs = [
         {
@@ -135,7 +172,7 @@ def main():
     ]
     for result in train.map(lr_configs):
         print(result)
-        
+
     batch_sizes = [64, 128, 256, 512]
     batch_size_configs = [
         {
@@ -163,7 +200,8 @@ def main():
     ]
     for result in train.map(batch_size_configs):
         print(result)
-        
+    """
+
     warmup_steps = [100, 200, 500, 1000]
     warmup_step_configs = [
         {
@@ -174,7 +212,7 @@ def main():
             "vocab_size": 32000,
             "context_length": 512,
             "rope_theta": 10000.0,
-            "lr": 0.008,
+            "lr": 0.007,
             "lr_min": 1e-4,
             "warmup_steps": warmup_step,
             "betas": [0.9, 0.999],
@@ -191,8 +229,8 @@ def main():
     ]
     for result in train.map(warmup_step_configs):
         print(result)
-    
-    weight_decays = [0.0, 0.001, 0.01, 0.05, 0.1]
+
+    weight_decays = [0.0, 0.001, 0.01, 0.05]
     weight_decay_configs = [
         {
             "d_model": 512,
@@ -202,7 +240,7 @@ def main():
             "vocab_size": 32000,
             "context_length": 512,
             "rope_theta": 10000.0,
-            "lr": 0.008,
+            "lr": 0.007,
             "lr_min": 1e-4,
             "warmup_steps": 500,
             "betas": [0.9, 0.999],
@@ -219,8 +257,7 @@ def main():
     ]
     for result in train.map(weight_decay_configs):
         print(result)
-        
-    
+
 
 if __name__ == "__main__":
     main()
