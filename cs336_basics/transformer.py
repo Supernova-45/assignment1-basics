@@ -143,15 +143,10 @@ class Attention(torch.nn.Module):
         self, d_model: int, num_heads: int, context_length: int, rope: RotaryPositionalEmbedding | None = None
     ):
         super().__init__()
-        self.d_model = d_model
         self.num_heads = num_heads
         std = math.sqrt(2 / (d_model + d_model))
-        self.q_proj_weight = torch.nn.Parameter(torch.empty((d_model, d_model)))
-        torch.nn.init.trunc_normal_(self.q_proj_weight, mean=0, std=std, a=-3 * std, b=3 * std)
-        self.k_proj_weight = torch.nn.Parameter(torch.empty((d_model, d_model)))
-        torch.nn.init.trunc_normal_(self.k_proj_weight, mean=0, std=std, a=-3 * std, b=3 * std)
-        self.v_proj_weight = torch.nn.Parameter(torch.empty((d_model, d_model)))
-        torch.nn.init.trunc_normal_(self.v_proj_weight, mean=0, std=std, a=-3 * std, b=3 * std)
+        self.qkv_weight = torch.nn.Parameter(torch.empty(3 * d_model, d_model))
+        torch.nn.init.trunc_normal_(self.qkv_weight, mean=0, std=std, a=-3 * std, b=3 * std)
         self.o_proj_weight = torch.nn.Parameter(torch.empty((d_model, d_model)))
         torch.nn.init.trunc_normal_(self.o_proj_weight, mean=0, std=std, a=-3 * std, b=3 * std)
         self.register_buffer("mask", torch.tril(torch.ones(context_length, context_length)).bool(), persistent=False)
@@ -165,9 +160,11 @@ class Attention(torch.nn.Module):
         # apply causal masking
         seq_len = x.shape[-2]
         mask = self.mask[:seq_len, :seq_len]
-        q = rearrange(x @ self.q_proj_weight.T, "... seq_len (h d_k) -> ... h seq_len d_k", h=self.num_heads)
-        k = rearrange(x @ self.k_proj_weight.T, "... seq_len (h d_k) -> ... h seq_len d_k", h=self.num_heads)
-        v = rearrange(x @ self.v_proj_weight.T, "... seq_len (h d_v) -> ... h seq_len d_v", h=self.num_heads)
+        qkv = x @ self.qkv_weight.T
+        q, k, v = qkv.chunk(3, dim=-1)
+        q = rearrange(q, "... seq_len (h d_k) -> ... h seq_len d_k", h=self.num_heads)
+        k = rearrange(k, "... seq_len (h d_k) -> ... h seq_len d_k", h=self.num_heads)
+        v = rearrange(v, "... seq_len (h d_v) -> ... h seq_len d_v", h=self.num_heads)
         # apply rope
         if self.rope is not None:
             q = self.rope.forward(q, token_positions)

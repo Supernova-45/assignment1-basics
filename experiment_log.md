@@ -186,3 +186,77 @@ Settled on this config:
                 "architecture": "TransformerLM",
                 "checkpoint_path": str(DATA_PATH / "checkpoints" / f"test_{c['name']}.pt"),
             }
+
+
+More tuning
+data/checkpoints/test_model_11.pt 3.05505
+data/checkpoints/test_model_5.pt 3.06274
+data/checkpoints/test_model_2.pt 3.16119
+data/checkpoints/test_wide_0.005.pt 3.22168
+data/checkpoints/test_model_24.pt 3.17307
+data/checkpoints/test_model_22.pt 3.19769
+data/checkpoints/test_model_21.pt 3.23463
+data/checkpoints/test_model_20.pt 3.26544
+data/checkpoints/test_model_19.pt 3.16976
+data/checkpoints/test_model_17.pt 3.29435
+data/checkpoints/test_model_16.pt 3.26472
+data/checkpoints/test_model_15.pt 3.1721
+data/checkpoints/test_model_14.pt 3.46161
+data/checkpoints/test_model_12.pt 3.1831
+data/checkpoints/test_model_10.pt 3.14296
+data/checkpoints/test_model_9.pt 3.18393
+data/checkpoints/test_model_7.pt 3.14589
+data/checkpoints/test_model_4.pt 3.23743
+
+Best were 5, 11
+configs = [
+        {
+            "d_model": 768,
+            "num_heads": 12,
+            "num_layers": 6,
+            "d_ff": 2048,
+            "lr": 0.003,
+            "batch_size": 128,
+            "warmup_steps": 500,
+            "weight_decay": 0.01,
+            "max_grad_norm": 1.0,
+            "name": "model_5",
+        },
+        {
+            "d_model": 640,
+            "num_heads": 10,
+            "num_layers": 8,
+            "d_ff": 1728,
+            "lr": 0.003,
+            "batch_size": 128,
+            "warmup_steps": 500,
+            "weight_decay": 0.01,
+            "max_grad_norm": 1.0,
+            "name": "model_11",
+        },
+    ]
+
+full_configs.append(
+            {
+                "d_model": c["d_model"],
+                "num_heads": c["num_heads"],
+                "num_layers": c["num_layers"],
+                "d_ff": c["d_ff"],
+                "vocab_size": 32000,
+                "context_length": 512,
+                "rope_theta": 10000.0,
+                "lr": c["lr"],
+                "lr_min": 1e-5,
+                "warmup_steps": c["warmup_steps"],
+                "betas": [0.9, 0.999],
+                "eps": 1e-8,
+                "weight_decay": c["weight_decay"],
+                "num_steps": 30000,
+                "batch_size": c["batch_size"],
+                "max_grad_norm": c["max_grad_norm"],
+                "max_time_seconds": 2700,  # 45 minutes
+                "device": "cuda",
+                "architecture": "TransformerLM",
+                "checkpoint_path": str(DATA_PATH / "checkpoints" / f"test_{c['name']}.pt"),
+            }
+        )

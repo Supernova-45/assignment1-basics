@@ -166,9 +166,7 @@ def run_multihead_self_attention(
     attention = Attention(d_model, num_heads, context_length=512)
     attention.load_state_dict(
         {
-            "q_proj_weight": q_proj_weight,
-            "k_proj_weight": k_proj_weight,
-            "v_proj_weight": v_proj_weight,
+            "qkv_weight" : torch.cat((q_proj_weight, k_proj_weight, v_proj_weight), dim=0),
             "o_proj_weight": o_proj_weight,
         }
     )
@@ -215,9 +213,7 @@ def run_multihead_self_attention_with_rope(
     attention = Attention(d_model, num_heads, context_length=max_seq_len, rope=RotaryPositionalEmbedding(theta, d_model // num_heads, max_seq_len))
     attention.load_state_dict(
         {
-            "q_proj_weight": q_proj_weight,
-            "k_proj_weight": k_proj_weight,
-            "v_proj_weight": v_proj_weight,
+            "qkv_weight" : torch.cat((q_proj_weight, k_proj_weight, v_proj_weight), dim=0),
             "o_proj_weight": o_proj_weight,
         }
     )
@@ -327,9 +323,7 @@ def run_transformer_block(
     )
     block.attention.load_state_dict(
         {
-            "q_proj_weight": weights["attn.q_proj.weight"],
-            "k_proj_weight": weights["attn.k_proj.weight"],
-            "v_proj_weight": weights["attn.v_proj.weight"],
+            "qkv_weight" : torch.cat((weights["attn.q_proj.weight"], weights["attn.k_proj.weight"], weights["attn.v_proj.weight"]), dim=0),
             "o_proj_weight": weights["attn.output_proj.weight"],
         }
     )
@@ -439,9 +433,7 @@ def run_transformer_lm(
         )
         block.attention.load_state_dict(
             {
-                "q_proj_weight": weights[f"layers.{i}.attn.q_proj.weight"],
-                "k_proj_weight": weights[f"layers.{i}.attn.k_proj.weight"],
-                "v_proj_weight": weights[f"layers.{i}.attn.v_proj.weight"],
+                "qkv_weight" : torch.cat((weights[f"layers.{i}.attn.q_proj.weight"], weights[f"layers.{i}.attn.k_proj.weight"], weights[f"layers.{i}.attn.v_proj.weight"]), dim=0),
                 "o_proj_weight": weights[f"layers.{i}.attn.output_proj.weight"],
             }
         )
