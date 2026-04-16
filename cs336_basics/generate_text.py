@@ -14,10 +14,10 @@ wandb_secret = modal.Secret.from_name("wandb")
     timeout=600,
 )
 def generate():
-    from src.training_helpers import AdamW, decode_lm, load_checkpoint
-    from src.transformer import TransformerLM, RotaryPositionalEmbedding
+    from cs336_basics.training_helpers import AdamW, decode_lm, load_checkpoint
+    from cs336_basics.transformer import TransformerLM, RotaryPositionalEmbedding
     import torch
-    from src.tokenizer import Tokenizer
+    from cs336_basics.tokenizer import Tokenizer
 
     device = "cuda"
 

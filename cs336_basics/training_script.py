@@ -7,8 +7,8 @@ import time
 
 import wandb
 
-from src.transformer import TransformerLM, RotaryPositionalEmbedding
-from src.training_helpers import (
+from cs336_basics.transformer import TransformerLM, RotaryPositionalEmbedding
+from cs336_basics.training_helpers import (
     cross_entropy,
     AdamW,
     lr_cosine_schedule,

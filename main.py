@@ -20,8 +20,8 @@ def train(config):
     import time
     import wandb
     from einops import rearrange
-    from src.transformer import TransformerLM, RotaryPositionalEmbedding
-    from src.training_helpers import (
+    from cs336_basics.transformer import TransformerLM, RotaryPositionalEmbedding
+    from cs336_basics.training_helpers import (
         cross_entropy,
         AdamW,
         lr_cosine_schedule,
@@ -44,6 +44,7 @@ def train(config):
     train_data = np.memmap(str(DATA_PATH / "tokenized" / "owt_train.bin"), dtype=np.uint16, mode="r")
     val_data = np.memmap(str(DATA_PATH / "tokenized" / "owt_valid.bin"), dtype=np.uint16, mode="r")
 
+    torch.set_float32_matmul_precision("high")
     rope = RotaryPositionalEmbedding(cfg.rope_theta, cfg.d_model // cfg.num_heads, max_seq_len=cfg.context_length)
     lm = TransformerLM(
         d_model=cfg.d_model,

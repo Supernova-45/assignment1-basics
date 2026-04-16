@@ -9,9 +9,9 @@ import torch
 from jaxtyping import Bool, Float, Int
 from torch import Tensor
 
-from src.tokenizer_training import train_bpe
-from src.tokenizer import Tokenizer
-from src.transformer import (
+from cs336_basics.tokenizer_training import train_bpe
+from cs336_basics.tokenizer import Tokenizer
+from cs336_basics.transformer import (
     Linear,
     Embedding,
     RMSNorm,
@@ -23,7 +23,7 @@ from src.transformer import (
     TransformerBlock,
     TransformerLM,
 )
-from src.training_helpers import (
+from cs336_basics.training_helpers import (
     cross_entropy,
     AdamW,
     lr_cosine_schedule,

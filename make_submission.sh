@@ -31,6 +31,7 @@ zip -r "$output_file" . \
     -x '*.pt' \
     -x '*.pth' \
     -x '*.npy' \
-    -x '*.npz'
+    -x '*.npz' \
+    -x '*.bin'
 
 echo "All files have been compressed into $output_file"

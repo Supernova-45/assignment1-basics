@@ -10,8 +10,8 @@ from typing import Optional
 import numpy.typing as npt
 import math
 
-from src.transformer import softmax, TransformerLM
-from src.tokenizer import Tokenizer
+from cs336_basics.transformer import softmax, TransformerLM
+from cs336_basics.tokenizer import Tokenizer
 
 
 def cross_entropy(

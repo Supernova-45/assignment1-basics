@@ -11,7 +11,7 @@ from pathlib import Path
 import tracemalloc
 import heapq
 
-from src.tokenizer_worker import compile_re, pre_tokenize_chunk
+from cs336_basics.tokenizer_worker import compile_re, pre_tokenize_chunk
 
 
 class PairEntry:
