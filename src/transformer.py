@@ -35,14 +35,17 @@ class Embedding(torch.nn.Module):
         embedding_dim: int,
         device: torch.device | None = None,
         dtype: torch.dtype | None = None,
+        tie_embeddings: bool | None = False,
     ):
         super().__init__()
-        self.num_embeddings = num_embeddings
-        self.embedding_dim = embedding_dim
         self.device = device
         self.dtype = dtype
-        self.W = torch.empty(size=(self.num_embeddings, self.embedding_dim), device=self.device, dtype=self.dtype)
-        self.W = torch.nn.Parameter(torch.nn.init.trunc_normal_(tensor=self.W, mean=0, std=1, a=-3, b=3))
+        self.W = torch.empty(size=(num_embeddings, embedding_dim), device=self.device, dtype=self.dtype)
+        if tie_embeddings:
+            std = 1 / math.sqrt(embedding_dim)
+        else:
+            std = 1
+        self.W = torch.nn.Parameter(torch.nn.init.trunc_normal_(tensor=self.W, mean=0, std=std, a=-3, b=3))
 
     def forward(self, token_ids: Tensor) -> Tensor:
         return self.W[token_ids]
@@ -117,12 +120,10 @@ class RotaryPositionalEmbedding(torch.nn.Module):
 
 
 def softmax(x: Tensor, dim: int) -> Tensor:
-    in_dtype = x.dtype
-    x = x.to(torch.float32)
     input = x - torch.max(x, dim=dim, keepdim=True)[0]
     expd = torch.exp(input)
     result = expd / torch.sum(expd, dim=dim, keepdim=True)
-    return result.to(in_dtype)
+    return result
 
 
 def scaled_dot_product_attention(
@@ -178,7 +179,14 @@ class Attention(torch.nn.Module):
 
 
 class TransformerBlock(torch.nn.Module):
-    def __init__(self, d_model: int, num_heads: int, d_ff: int, context_length: int, rope: RotaryPositionalEmbedding | None = None):
+    def __init__(
+        self,
+        d_model: int,
+        num_heads: int,
+        d_ff: int,
+        context_length: int,
+        rope: RotaryPositionalEmbedding | None = None,
+    ):
         super().__init__()
         self.norm1 = RMSNorm(d_model)
         self.norm2 = RMSNorm(d_model)
@@ -206,17 +214,27 @@ class TransformerLM(torch.nn.Module):
         vocab_size: int,
         context_length: int,
         num_layers: int,
+        tie_embeddings: bool | None = False,
         rope: RotaryPositionalEmbedding | None = None,
     ):
         super().__init__()
-        self.embedding = Embedding(num_embeddings=vocab_size, embedding_dim=d_model)
-        self.layers = torch.nn.ModuleList([TransformerBlock(d_model, num_heads, d_ff, context_length, rope) for _ in range(num_layers)])
+        self.d_model = d_model
+        self.embedding = Embedding(num_embeddings=vocab_size, embedding_dim=d_model, tie_embeddings=tie_embeddings)
+        self.layers = torch.nn.ModuleList(
+            [TransformerBlock(d_model, num_heads, d_ff, context_length, rope) for _ in range(num_layers)]
+        )
         self.norm3 = RMSNorm(d_model)
         self.linear = Linear(d_model, vocab_size)
+        self.tie_embeddings = tie_embeddings
+        if self.tie_embeddings:
+            self.linear.W = self.embedding.W
 
     def forward(self, x: Tensor, token_positions: Float[Tensor, "batch sequence_length d_model"] | None = None):
         # token embeddings
-        x = self.embedding.forward(x)
+        if self.tie_embeddings:
+            x = self.embedding.forward(x) * math.sqrt(self.d_model)
+        else:
+            x = self.embedding.forward(x)
         for layer in self.layers:
             x = layer.forward(x, token_positions)
         x = self.norm3.forward(x)

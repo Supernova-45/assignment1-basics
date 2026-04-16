@@ -17,14 +17,11 @@ from src.tokenizer import Tokenizer
 def cross_entropy(
     inputs: Float[Tensor, " batch_size vocab_size"], targets: Int[Tensor, " batch_size"]
 ) -> Float[Tensor, ""]:
+    inputs = inputs.float()
     inputs = inputs - torch.max(inputs, dim=-1, keepdim=True)[0]
     indices = torch.arange(targets.shape[0], device=targets.device)
     loss = -1 * inputs[indices, targets] + torch.log(torch.sum(torch.exp(inputs), dim=-1))
     return loss.mean()
-
-
-def perplexity():
-    pass
 
 
 class SGD(torch.optim.Optimizer):

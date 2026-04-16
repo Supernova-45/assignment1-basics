@@ -158,74 +158,30 @@ def train(config):
 
 @app.local_entrypoint()
 def main():
-    configs = [
-        {
-            "d_model": 768,
-            "num_heads": 12,
-            "num_layers": 4,
-            "d_ff": 2048,
-            "lr": 0.005,
-            "batch_size": 128,
-            "name": "wide_0.005",
-        },
-        {
-            "d_model": 768,
-            "num_heads": 12,
-            "num_layers": 4,
-            "d_ff": 2048,
-            "lr": 0.007,
-            "batch_size": 128,
-            "name": "wide_0.007",
-        },
-        {
-            "d_model": 640,
-            "num_heads": 10,
-            "num_layers": 6,
-            "d_ff": 1728,
-            "lr": 0.007,
-            "batch_size": 128,
-            "name": "balanced_0.007",
-        },
-        {
-            "d_model": 640,
-            "num_heads": 10,
-            "num_layers": 6,
-            "d_ff": 1728,
-            "lr": 0.005,
-            "batch_size": 128,
-            "name": "balanced_0.005",
-        },
-    ]
-
-    full_configs = []
-    for c in configs:
-        full_configs.append(
-            {
-                "d_model": c["d_model"],
-                "num_heads": c["num_heads"],
-                "num_layers": c["num_layers"],
-                "d_ff": c["d_ff"],
-                "vocab_size": 32000,
-                "context_length": 512,
-                "rope_theta": 10000.0,
-                "lr": c["lr"],
-                "lr_min": 1e-5,
-                "warmup_steps": 500,
-                "betas": [0.9, 0.999],
-                "eps": 1e-8,
-                "weight_decay": 0.01,
-                "num_steps": 100000,
-                "batch_size": c["batch_size"],
-                "max_grad_norm": 1.0,
-                "max_time_seconds": 2700,  # 45 minutes
-                "device": "cuda",
-                "architecture": "TransformerLM",
-                "checkpoint_path": str(DATA_PATH / "checkpoints" / f"test_{c['name']}.pt"),
-            }
-        )
-
-    for result in train.map(full_configs):
-        print(result)
+    config = {
+        "d_model": 768,
+        "num_heads": 12,
+        "num_layers": 4,
+        "d_ff": 2048,
+        "vocab_size": 32000,
+        "context_length": 512,
+        "rope_theta": 10000.0,
+        "lr": 0.005,
+        "lr_min": 1e-5,
+        "warmup_steps": 500,
+        "betas": [0.9, 0.999],
+        "eps": 1e-8,
+        "weight_decay": 0.01,
+        "num_steps": 100000,
+        "batch_size": 128,
+        "max_grad_norm": 1.0,
+        "max_time_seconds": 2700,
+        "device": "cuda",
+        "architecture": "TransformerLM",
+        "checkpoint_path": str(DATA_PATH / "checkpoints" / "final.pt"),
+    }
+    result = train.remote(config)
+    print(result)
 
 
 if __name__ == "__main__":

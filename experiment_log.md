@@ -161,3 +161,28 @@ Ideas for experiments:
 - tie the weights of the input and output embeddings together 
 - hyperparameter sweep (e.g., 16 layers, 4 vs 8 heads, 1024 vs 512 d_model, 512 seq len, 128 vs 256 batch size, and change number of iters)
 - mixed precision: bf16 vs fp32
+
+Tried tying embeddings and adjusting std; didn't work
+Settled on this config:
+{
+                "d_model": 768,
+                "num_heads": 12,
+                "num_layers": 4,
+                "d_ff": 2048,
+                "vocab_size": 32000,
+                "context_length": 512,
+                "rope_theta": 10000.0,
+                "lr": 0.005,
+                "lr_min": 1e-5,
+                "warmup_steps": 500,
+                "betas": [0.9, 0.999],
+                "eps": 1e-8,
+                "weight_decay": 0.01,
+                "num_steps": 100000,
+                "batch_size": 128,
+                "max_grad_norm": 1.0,
+                "max_time_seconds": 2700,  # 45 minutes
+                "device": "cuda",
+                "architecture": "TransformerLM",
+                "checkpoint_path": str(DATA_PATH / "checkpoints" / f"test_{c['name']}.pt"),
+            }
