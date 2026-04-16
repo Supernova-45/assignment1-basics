@@ -101,6 +101,7 @@ def lr_cosine_schedule(
 
 
 def gradient_clipping(parameters: Iterable[torch.nn.Parameter], max_l2_norm: float) -> None:
+    parameters = list(parameters)
     eps = 1e-6
     norm = 0
     for param in parameters:

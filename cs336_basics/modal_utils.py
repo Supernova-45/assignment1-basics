@@ -17,7 +17,6 @@ user_volume = modal.Volume.from_name(f"basics-{SUNET_ID}", create_if_missing=Tru
 def build_image(*, include_tests: bool = False) -> modal.Image:
     image = modal.Image.debian_slim().apt_install("wget", "gzip").uv_sync()
     image = image.add_local_python_source("cs336_basics")
-    image = image.add_local_python_source("src")
     if include_tests:
         image = image.add_local_dir("tests", remote_path="/root/tests")
     return image
