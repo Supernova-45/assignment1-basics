@@ -66,23 +66,28 @@ def train(config):
         for group in optimizer.param_groups:
             group["lr"] = new_lr
         inputs, targets = get_batch(train_data, cfg.batch_size, cfg.context_length, device=cfg.device)
-        logits = lm.forward(inputs, token_positions)
-        loss = cross_entropy(rearrange(logits, "b c v -> (b c) v"), rearrange(targets, "b c -> (b c)"))
+        with torch.autocast(device_type="cuda", dtype=torch.bfloat16):
+            logits = lm.forward(inputs, token_positions)
+            loss = cross_entropy(rearrange(logits, "b c v -> (b c) v"), rearrange(targets, "b c -> (b c)"))
         loss.backward()
         gradient_clipping(lm.parameters(), cfg.max_grad_norm)
         optimizer.step()
         optimizer.zero_grad()
         elapsed = time.time() - start_time
         # logging
-        if t % 100 == 0:
+        if t % 200 == 0:
             # test on validation dataset
             with torch.no_grad():
-                val_inputs, val_targets = get_batch(val_data, cfg.batch_size, cfg.context_length, device=cfg.device)
-                val_logits = lm(val_inputs, token_positions)
-                val_loss = cross_entropy(
-                    rearrange(val_logits, "b t v -> (b t) v"), rearrange(val_targets, "b t -> (b t)")
-                )
-                val_perplexity = torch.exp(val_loss)
+                with torch.autocast(device_type="cuda", dtype=torch.bfloat16):
+                    total_val_loss = 0
+                    for i in range(10):
+                        val_inputs, val_targets = get_batch(val_data, cfg.batch_size, cfg.context_length, device=cfg.device)
+                        val_logits = lm(val_inputs, token_positions)
+                        total_val_loss += cross_entropy(
+                            rearrange(val_logits, "b t v -> (b t) v"), rearrange(val_targets, "b t -> (b t)")
+                        )
+                    val_loss = total_val_loss / 10
+                    val_perplexity = torch.exp(val_loss)
 
             print(f"Step {t} | Train loss: {loss.item():.4f} | Val loss: {val_loss.item():.4f} | Time: {elapsed}")
             wandb.log(

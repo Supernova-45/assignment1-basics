@@ -1,6 +1,7 @@
 import os
 import typing
 
+import numpy as np
 import torch
 from jaxtyping import Bool, Float, Int
 from torch import Tensor
@@ -17,7 +18,7 @@ def cross_entropy(
     inputs: Float[Tensor, " batch_size vocab_size"], targets: Int[Tensor, " batch_size"]
 ) -> Float[Tensor, ""]:
     inputs = inputs - torch.max(inputs, dim=-1, keepdim=True)[0]
-    indices = torch.arange(targets.shape[0])
+    indices = torch.arange(targets.shape[0], device=targets.device)
     loss = -1 * inputs[indices, targets] + torch.log(torch.sum(torch.exp(inputs), dim=-1))
     return loss.mean()
 
@@ -122,8 +123,10 @@ def get_batch(
     dataset: npt.NDArray, batch_size: int, context_length: int, device: str
 ) -> tuple[torch.Tensor, torch.Tensor]:
     positions = torch.randint(dataset.shape[0] - context_length, (batch_size,))
-    inputs = torch.stack([torch.tensor(dataset[i : i + context_length], dtype=torch.long, device=device) for i in positions])
-    targets = torch.stack([torch.tensor(dataset[i + 1 : i + context_length + 1], dtype=torch.long, device=device) for i in positions])
+    inputs_arr = np.stack([dataset[i : i + context_length] for i in positions])
+    targets_arr = np.stack([dataset[i + 1 : i + context_length + 1] for i in positions])
+    inputs = torch.from_numpy(inputs_arr.astype(np.int64)).to(device)
+    targets = torch.from_numpy(targets_arr.astype(np.int64)).to(device)
     return (inputs, targets)
 
 
@@ -178,9 +181,8 @@ def decode_lm(
             prompt_tokens = torch.cat([prompt_tokens, next_token], dim=-1)
             decoded_text += tokenizer.decode([next_token.item()])
             num_generated += 1
-            
+
             if next_token == stop_token:
                 return decoded_text
-            
 
     return decoded_text

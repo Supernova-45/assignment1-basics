@@ -78,7 +78,7 @@ class SwiGLU(torch.nn.Module):
         super().__init__()
         self.d_model = d_model
         self.d_ff = d_ff if d_ff else ((8 / 3 * d_model) // 64 + 1) * 64
-        std = math.sqrt(2 / (d_model + d_ff))
+        std = math.sqrt(2 / (d_model + self.d_ff))
         self.W1 = torch.nn.Parameter(torch.empty((self.d_ff, d_model)))
         torch.nn.init.trunc_normal_(self.W1, mean=0, std=std, a=-3 * std, b=3 * std)
         self.W2 = torch.nn.Parameter(torch.empty((d_model, self.d_ff)))
@@ -117,9 +117,12 @@ class RotaryPositionalEmbedding(torch.nn.Module):
 
 
 def softmax(x: Tensor, dim: int) -> Tensor:
+    in_dtype = x.dtype
+    x = x.to(torch.float32)
     input = x - torch.max(x, dim=dim, keepdim=True)[0]
     expd = torch.exp(input)
-    return expd / torch.sum(expd, dim=dim, keepdim=True)
+    result = expd / torch.sum(expd, dim=dim, keepdim=True)
+    return result.to(in_dtype)
 
 
 def scaled_dot_product_attention(

@@ -159,13 +159,5 @@ Ideas for experiments:
 - check on validation loss
 - Untying the embeddings and lm head
 - tie the weights of the input and output embeddings together 
-- hyperparameter sweep (e.g., 16 layers, 8 heads, 1024 d_model, 512 seq len, 128 batch size, and ran for around 20k iters)
-- U-net like structure, store the hidden
-  output state from each attention layer for the layers/2 first blocks and add them
-  to the layers/2 last blocks in reverse order, learn a parameter for deciding how
-   to mix the previous hidden states and the current one.
-- tate-of-the-art open-source LLM families, such as Llama 3 [A. Grattafiori et
-  al., 2024] or Qwen 2.5
-  [A. Yang et al., 2024].
-  • The NanoGPT speedrun repository (github.com/KellerJordan/modded-nanogpt), where
-  community
+- hyperparameter sweep (e.g., 16 layers, 4 vs 8 heads, 1024 vs 512 d_model, 512 seq len, 128 vs 256 batch size, and change number of iters)
+- mixed precision: bf16 vs fp32
