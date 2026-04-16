@@ -138,7 +138,9 @@ def scaled_dot_product_attention(
 
 
 class Attention(torch.nn.Module):
-    def __init__(self, d_model: int, num_heads: int, rope: RotaryPositionalEmbedding | None = None):
+    def __init__(
+        self, d_model: int, num_heads: int, context_length: int, rope: RotaryPositionalEmbedding | None = None
+    ):
         super().__init__()
         self.d_model = d_model
         self.num_heads = num_heads
@@ -151,6 +153,7 @@ class Attention(torch.nn.Module):
         torch.nn.init.trunc_normal_(self.v_proj_weight, mean=0, std=std, a=-3 * std, b=3 * std)
         self.o_proj_weight = torch.nn.Parameter(torch.empty((d_model, d_model)))
         torch.nn.init.trunc_normal_(self.o_proj_weight, mean=0, std=std, a=-3 * std, b=3 * std)
+        self.register_buffer("mask", torch.tril(torch.ones(context_length, context_length)).bool(), persistent=False)
         self.rope = rope
 
     def forward(
@@ -160,7 +163,7 @@ class Attention(torch.nn.Module):
     ) -> Float[Tensor, " ... sequence_length d_model"]:
         # apply causal masking
         seq_len = x.shape[-2]
-        mask = torch.tril(torch.ones(seq_len, seq_len, device=x.device), diagonal=0).bool()
+        mask = self.mask[:seq_len, :seq_len]
         q = rearrange(x @ self.q_proj_weight.T, "... seq_len (h d_k) -> ... h seq_len d_k", h=self.num_heads)
         k = rearrange(x @ self.k_proj_weight.T, "... seq_len (h d_k) -> ... h seq_len d_k", h=self.num_heads)
         v = rearrange(x @ self.v_proj_weight.T, "... seq_len (h d_v) -> ... h seq_len d_v", h=self.num_heads)
@@ -175,12 +178,12 @@ class Attention(torch.nn.Module):
 
 
 class TransformerBlock(torch.nn.Module):
-    def __init__(self, d_model: int, num_heads: int, d_ff: int, rope: RotaryPositionalEmbedding | None = None):
+    def __init__(self, d_model: int, num_heads: int, d_ff: int, context_length: int, rope: RotaryPositionalEmbedding | None = None):
         super().__init__()
         self.norm1 = RMSNorm(d_model)
         self.norm2 = RMSNorm(d_model)
         self.ff = SwiGLU(d_model, d_ff)
-        self.attention = Attention(d_model, num_heads, rope)
+        self.attention = Attention(d_model, num_heads, context_length, rope)
 
     def forward(self, x: Tensor, token_positions: Float[Tensor, "batch sequence_length d_model"] | None = None):
         # first half
@@ -207,7 +210,7 @@ class TransformerLM(torch.nn.Module):
     ):
         super().__init__()
         self.embedding = Embedding(num_embeddings=vocab_size, embedding_dim=d_model)
-        self.layers = torch.nn.ModuleList([TransformerBlock(d_model, num_heads, d_ff, rope) for _ in range(num_layers)])
+        self.layers = torch.nn.ModuleList([TransformerBlock(d_model, num_heads, d_ff, context_length, rope) for _ in range(num_layers)])
         self.norm3 = RMSNorm(d_model)
         self.linear = Linear(d_model, vocab_size)
 

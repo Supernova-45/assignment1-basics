@@ -163,7 +163,7 @@ def run_multihead_self_attention(
         Float[Tensor, " ... sequence_length d_model"]: Tensor with the output of running your optimized, batched multi-headed attention
         implementation with the given QKV projection weights and input features.
     """
-    attention = Attention(d_model, num_heads)
+    attention = Attention(d_model, num_heads, context_length=512)
     attention.load_state_dict(
         {
             "q_proj_weight": q_proj_weight,
@@ -212,7 +212,7 @@ def run_multihead_self_attention_with_rope(
         Float[Tensor, " ... sequence_length d_model"]: Tensor with the output of running your optimized, batched multi-headed attention
         implementation with the given QKV projection weights and input features.
     """
-    attention = Attention(d_model, num_heads, rope=RotaryPositionalEmbedding(theta, d_model // num_heads, max_seq_len))
+    attention = Attention(d_model, num_heads, context_length=max_seq_len, rope=RotaryPositionalEmbedding(theta, d_model // num_heads, max_seq_len))
     attention.load_state_dict(
         {
             "q_proj_weight": q_proj_weight,
@@ -318,7 +318,7 @@ def run_transformer_block(
         running the Transformer block on the input features while using RoPE.
     """
     block = TransformerBlock(
-        d_model, num_heads, d_ff, RotaryPositionalEmbedding(theta, d_model // num_heads, max_seq_len)
+        d_model, num_heads, d_ff, max_seq_len, RotaryPositionalEmbedding(theta, d_model // num_heads, max_seq_len)
     )
     block.norm1.load_state_dict({"gain": weights["ln1.weight"]})
     block.norm2.load_state_dict({"gain": weights["ln2.weight"]})
