@@ -53,6 +53,8 @@ def train(config):
         vocab_size=cfg.vocab_size,
         context_length=cfg.context_length,
         num_layers=cfg.num_layers,
+        tie_embeddings=cfg.tie_embeddings,
+        use_relu=cfg.use_relu,
         rope=rope,
     )
     lm.to(device=cfg.device)
@@ -79,15 +81,15 @@ def train(config):
         loss.backward()
         gradient_clipping(lm.parameters(), cfg.max_grad_norm)
         optimizer.step()
-        optimizer.zero_grad()
+        optimizer.zero_grad(set_to_none=True)
         elapsed = time.time() - start_time
         # logging
-        if t % 200 == 0:
+        if t % 500 == 0:
             # test on validation dataset
             with torch.no_grad():
                 with torch.autocast(device_type="cuda", dtype=torch.bfloat16):
                     total_val_loss = 0
-                    for i in range(5):
+                    for i in range(3):
                         val_inputs, val_targets = get_batch(
                             val_data, cfg.batch_size, cfg.context_length, device=cfg.device
                         )
@@ -95,7 +97,7 @@ def train(config):
                         total_val_loss += cross_entropy(
                             rearrange(val_logits, "b t v -> (b t) v"), rearrange(val_targets, "b t -> (b t)")
                         )
-                    val_loss = total_val_loss / 5
+                    val_loss = total_val_loss / 3
                     val_perplexity = torch.exp(val_loss)
 
             print(f"Step {t} | Train loss: {loss.item():.4f} | Val loss: {val_loss.item():.4f} | Time: {elapsed}")
@@ -108,10 +110,6 @@ def train(config):
                     "wall_clock_seconds": elapsed,
                 }
             )
-
-        # checkpointing
-        if t % 1000 == 0:
-            save_checkpoint(lm, optimizer, t, cfg.checkpoint_path)
 
     save_checkpoint(lm._orig_mod, optimizer, t, cfg.checkpoint_path)
     # final val loss check
@@ -154,7 +152,6 @@ def train(config):
 
     user_volume = modal.Volume.from_name("basics-alexskim")
     user_volume.commit()
-    wandb.finish()
 
 
 @app.local_entrypoint()
@@ -162,21 +159,23 @@ def main():
     config = {
         "d_model": 768,
         "num_heads": 12,
-        "num_layers": 4,
-        "d_ff": 2048,
+        "num_layers": 6,
+        "d_ff": 3072,
         "vocab_size": 32000,
         "context_length": 512,
         "rope_theta": 10000.0,
-        "lr": 0.005,
-        "lr_min": 1e-5,
+        "lr": 0.003,
+        "lr_min": 1e-4,
         "warmup_steps": 500,
         "betas": [0.9, 0.999],
         "eps": 1e-8,
-        "weight_decay": 0.01,
-        "num_steps": 100000,
+        "weight_decay": 0.1,
+        "num_steps": 30000,
         "batch_size": 128,
         "max_grad_norm": 1.0,
-        "max_time_seconds": 2700,
+        "max_time_seconds": 2700,  # 45 minutes,
+        "tie_embeddings": True,
+        "use_relu": True,
         "device": "cuda",
         "architecture": "TransformerLM",
         "checkpoint_path": str(DATA_PATH / "checkpoints" / "final.pt"),
