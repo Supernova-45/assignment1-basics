@@ -449,4 +449,25 @@ worthy-terrain-173 128 2048 768 0.00001 0.003 12 6 data/checkpoints/test_test_7.
 glowing-plant-152 128 1728 640 0.00001 0.003 10 8 data/checkpoints/test_model_11.pt
 skilled-moon-146 128 2048 768 0.00001 0.003 12 6 data/checkpoints/test_model_5.pt
 
-found relu squared to work better than swiglu
+found relu squared to work better than swiglu - best:
+charmed-music-190 128 3072 768 0.00001 0.003 12 6 data/checkpoints/test_test_35.pt true 3.04311
+dark-voice-188 128 2048 768 0.00001 0.003 12 6 data/checkpoints/test_test_33.pt false 3.05449
+atomic-sun-187 128 2560 640 0.00001 0.003 10 8 data/checkpoints/test_test_32.pt true 3.04371
+upbeat-moon-185 128 1728 640 0.00001 0.003 10 8 data/checkpoints/test_test_30.pt false 3.05243
+whole-wave-174 128 1728 640 0.00001 0.003 10 8 data/checkpoints/test_test_8.pt 3.0586
+glowing-plant-152 128 1728 640 0.00001 0.003 10 8 data/checkpoints/test_model_11.pt 3.05505
+golden-mountain-189 128 2048 768 0.00001 0.003 12 6 data/checkpoints/test_test_34.pt true 3.09181
+
+found tying embeddings to work well
+128 3072 768 0.00001 0.003 12 6 data/checkpoints/test_test_35.pt true 3.04311
+128 2048 768 0.00001 0.003 12 6 data/checkpoints/test_test_33.pt false 3.05449
+128 2560 640 0.00001 0.003 10 8 data/checkpoints/test_test_32.pt true 3.04371
+128 1728 640 0.00001 0.003 10 8 data/checkpoints/test_test_30.pt false 3.05243
+128 1728 640 0.00001 0.003 10 8 data/checkpoints/test_test_8.pt 3.0586
+128 1728 640 0.00001 0.003 10 8 data/checkpoints/test_model_11.pt 3.05505
+128 2560 640 0.00001 0.001 10 8 data/checkpoints/test_test_55.pt true true 3.05984
+128 2560 640 0.00001 0.002 10 8 data/checkpoints/test_test_54.pt true true 3.02767
+128 2560 640 0.00001 0.003 10 8 data/checkpoints/test_test_53.pt true true 3.01909
+128 3072 768 0.00001 0.001 12 6 data/checkpoints/test_test_52.pt true true 3.0399
+128 3072 768 0.00001 0.002 12 6 data/checkpoints/test_test_51.pt true true 3.01606
+128 3072 768 0.00001 0.003 12 6 data/checkpoints/test_test_50.pt true true 3.0118

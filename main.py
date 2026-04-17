@@ -11,8 +11,8 @@ wandb_secret = modal.Secret.from_name("wandb")
     volumes=VOLUME_MOUNTS,
     gpu="B200",
     secrets=[wandb_secret],
-    timeout=21600,
-    max_containers=4,
+    timeout=3000,
+    max_containers=1,
 )
 def train(config):
     import numpy as np
