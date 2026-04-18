@@ -222,7 +222,7 @@ def pre_tokenize(input_path, num_processes, special_tokens):
 
 
 def train_bpe(input_path: str, vocab_size: int, special_tokens: list[str]):
-    num_processes = 6 
+    num_processes = 4 
 
     indices = pre_tokenize(input_path, num_processes, special_tokens)
     merges = []
@@ -293,13 +293,13 @@ def main():
     # tracemalloc.start(25)
 
     start = time.perf_counter()
-    vocab, merges = train_bpe("data/raw_data/TinyStoriesV2-GPT4-train.txt", 10000, special_tokens)
+    vocab, merges = train_bpe("data/raw_data/owt_train.txt", 32000, special_tokens)
     end = time.perf_counter()
     #current_bytes, peak_bytes = tracemalloc.get_traced_memory()
     #snapshot = tracemalloc.take_snapshot()
     #tracemalloc.stop()
 
-    save_artifacts(vocab, merges, "output_tiny_bpe")
+    save_artifacts(vocab, merges, "output_owt_bpe_new")
     token_id, token_bytes = longest_token(vocab)
     print(f"Elapsed: {end - start}")
     print(f"Longest token: {token_id}, {token_bytes}")

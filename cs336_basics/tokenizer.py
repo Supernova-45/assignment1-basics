@@ -16,6 +16,7 @@ class Tokenizer:
             self.merge_lookup[(left, right)] = (i, left + right)
         self.special_tokens = special_tokens or []
         self.special_token_set = set(self.special_tokens)
+        self.byte_tokens = tuple(bytes([i]) for i in range(256))
         # Construct reverse bytes to int
         self.reverse_vocab = {}
         for k, v in vocab.items():
@@ -38,7 +39,7 @@ class Tokenizer:
     def encode(self, text: str) -> list[int]:
         """Encode an input text into a sequence of token IDs."""
 
-        special_set = set(self.special_tokens or [])
+        special_set = self.special_token_set
 
         # Split around special tokens first
         if self.special_tokens:
@@ -53,8 +54,7 @@ class Tokenizer:
                 tokens.append(part)
             else:
                 for pretok in self.base_pat.findall(part):
-                    tokens.append([bytes([b]) for b in pretok.encode("utf-8")])
-
+                    tokens.append([self.byte_tokens[b] for b in pretok.encode("utf-8")])
         # Apply merges to each normal token
         for idx, token in enumerate(tokens):
             if isinstance(token, str):  # special token, skip
@@ -151,25 +151,36 @@ def get_compression_ratio():
     print(f"bytes / seconds: {owt_bytes / elapsed}")
     
     
-def encode_dataset(tokenizer, input_path, output_path):
-    with open(input_path, "r") as f, open(output_path, "wb") as out:
-        chunk = []
-        for token_id in tokenizer.encode_iterable(f):
-            chunk.append(token_id)
-            if len(chunk) >= 1000000:
-                np.array(chunk, dtype=np.uint16).tofile(out)
-                chunk = []
-        if chunk:
-            np.array(chunk, dtype=np.uint16).tofile(out)
+def encode_dataset(tokenizer, input_path, output_path, lines_per_batch=2048, token_buffer_size=4000000):
+    with open(input_path, "r", encoding="utf-8") as f, open(output_path, "wb") as out:
+        line_batch = []
+        token_buffer = []
+
+        for line in f:
+            line_batch.append(line)
+
+            if len(line_batch) >= lines_per_batch:
+                token_buffer.extend(tokenizer.encode("".join(line_batch)))
+                line_batch.clear()
+
+                if len(token_buffer) >= token_buffer_size:
+                    np.asarray(token_buffer, dtype=np.uint16).tofile(out)
+                    token_buffer.clear()
+
+        if line_batch:
+            token_buffer.extend(tokenizer.encode("".join(line_batch)))
+
+        if token_buffer:
+            np.asarray(token_buffer, dtype=np.uint16).tofile(out)
             
 def main():
-    tiny_tokenizer = Tokenizer.from_files("output/output_tiny_bpe/vocab.pkl", "output/output_tiny_bpe/merges.pkl", ["<|endoftext|>"])
-    owt_tokenizer = Tokenizer.from_files("output/output_owt_bpe/vocab.pkl", "output/output_owt_bpe/merges.pkl", ["<|endoftext|>"])
+    #tiny_tokenizer = Tokenizer.from_files("output_tiny_bpe/vocab.pkl", "output/output_tiny_bpe/merges.pkl", ["<|endoftext|>"])
+    owt_tokenizer = Tokenizer.from_files("output_owt_bpe_new/vocab.pkl", "output_owt_bpe_new/merges.pkl", ["<|endoftext|>"])
 
-    encode_dataset(tiny_tokenizer, "data/raw_data/TinyStoriesV2-GPT4-train.txt", "output/tiny_train.bin")
-    encode_dataset(tiny_tokenizer, "data/raw_data/TinyStoriesV2-GPT4-valid.txt", "output/tiny_valid.bin")
-    encode_dataset(owt_tokenizer, "data/raw_data/owt_train.txt", "output/owt_train.bin")
-    encode_dataset(owt_tokenizer, "data/raw_data/owt_valid.txt", "output/owt_valid.bin")
+    #encode_dataset(tiny_tokenizer, "data/raw_data/TinyStoriesV2-GPT4-train.txt", "output/tiny_train.bin")
+    #encode_dataset(tiny_tokenizer, "data/raw_data/TinyStoriesV2-GPT4-valid.txt", "output/tiny_valid.bin")
+    encode_dataset(owt_tokenizer, "data/raw_data/owt_train.txt", "output/owt_train_new.bin")
+    encode_dataset(owt_tokenizer, "data/raw_data/owt_valid.txt", "output/owt_valid_new.bin")
             
         
 if __name__ == "__main__":
